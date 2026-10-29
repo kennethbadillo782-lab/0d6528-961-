@@ -11,8 +11,10 @@ d=next((d for d in ds if d["name"]=="iPhone 17 Pro Max"),ds[0])
 print(d["udid"])
 ')
 echo "Destino real: $udid" | tee reports/ios-destination.txt
+xcrun simctl boot "$udid" 2>/dev/null || true
+xcrun simctl bootstatus "$udid" -b
 xcodebuild -project ios/MiCatalogo.xcodeproj -scheme MiCatalogo -configuration Debug \
-  -destination "platform=iOS Simulator,id=$udid" -derivedDataPath build/TestDerivedData \
+  -destination "platform=iOS Simulator,id=$udid" -parallel-testing-enabled NO -derivedDataPath build/TestDerivedData \
   -resultBundlePath "reports/ios-$(date +%s).xcresult" CODE_SIGNING_ALLOWED=NO test \
   2>&1 | tee reports/ios-tests.log
 
