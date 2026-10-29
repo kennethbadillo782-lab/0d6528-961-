@@ -14,7 +14,7 @@ struct FashionCatalogApp: App {
         ])
         do {
             container = try ModelContainer(
-                for: Product.self, ProductImage.self, ProductCollection.self, CatalogCategory.self
+                for: Product.self, ProductImage.self, ProductCollection.self, CatalogCategory.self, CloudSyncEntry.self
             )
         } catch {
             fatalError("No se pudo abrir la base de datos local: \(error)")

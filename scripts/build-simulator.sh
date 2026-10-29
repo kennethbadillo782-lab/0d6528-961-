@@ -5,6 +5,7 @@ command -v xcodebuild >/dev/null || { echo 'Se necesita macOS con Xcode 16 o pos
 command -v xcodegen >/dev/null || { echo 'Instala XcodeGen: brew install xcodegen'; exit 1; }
 mkdir -p build reports
 xcodebuild -version
+python3 scripts/configure-cloud.py
 (cd ios && xcodegen generate)
 # Appetize recomienda ARM simulator; una .ipa de dispositivo no sirve aquí.
 xcodebuild -project ios/MiCatalogo.xcodeproj -scheme MiCatalogo \
@@ -16,4 +17,4 @@ test -d "$app"
 file "$app/MiCatalogo" | tee reports/ios-binary.txt
 xcrun vtool -show-build "$app/MiCatalogo" | tee -a reports/ios-binary.txt
 ditto -c -k --sequesterRsrc --keepParent "$app" build/MiCatalogo-simulator.zip
-echo 'Compilación terminada. La app sigue en modo local; sincronización aún pendiente.'
+echo 'Compilación terminada; consultar los resultados de pruebas de sincronización.'

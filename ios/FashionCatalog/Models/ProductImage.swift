@@ -32,6 +32,8 @@ final class ProductImage {
     var id: UUID = UUID()
     /// La imagen se guarda en el dispositivo para que no dependa de que la tienda mantenga el enlace.
     @Attribute(.externalStorage) var data: Data?
+    var cloudPath: String = ""
+    var cloudUploadedHash: String = ""
     var remoteURL: String = ""
     var kindRaw: String = ImageKind.official.rawValue
     var order: Int = 0

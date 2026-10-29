@@ -3,6 +3,7 @@ import SwiftData
 
 struct RootView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.scenePhase) var scenePhase
     @Environment(\.modelContext) var context
 
     var body: some View {
@@ -38,7 +39,21 @@ struct RootView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .task { SeedService.seedIfNeeded(context) }
+        .task {
+            SeedService.seedIfNeeded(context)
+            await CloudAccount.shared.restore()
+            // Reintento periódico con cola persistente; también cubre cambios offline y de la API.
+            while !Task.isCancelled {
+                if scenePhase == .active { await CatalogSync.shared.run(context: context) }
+                try? await Task.sleep(for: .seconds(8))
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await CatalogSync.shared.run(context:context) } }
+        }
+        .onOpenURL { url in
+            Task { await CloudAccount.shared.acceptLink(url.absoluteString); await CatalogSync.shared.run(context:context) }
+        }
     }
 }
 

@@ -6,6 +6,7 @@ import SwiftData
 final class ProductCollection {
     var id: UUID = UUID()
     var name: String = ""
+    var cloudCoverPath: String?
     /// Portada elegida manualmente. Si es nil, se usa automáticamente el último producto.
     @Attribute(.externalStorage) var coverData: Data?
     var sortOrder: Int = 0

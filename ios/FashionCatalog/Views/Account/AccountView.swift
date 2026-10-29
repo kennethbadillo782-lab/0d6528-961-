@@ -210,20 +210,7 @@ struct AccountView: View {
         }
     }
 
-    private var syncCard: some View {
-        AccountCard(title: "Sincronización", symbol: "arrow.triangle.2.circlepath") {
-            HStack {
-                Text("Estado").foregroundStyle(Theme.textSecondary)
-                Spacer()
-                HStack(spacing: 6) {
-                    Circle().fill(Theme.green).frame(width: 8, height: 8)
-                    Text("Solo en este iPhone").foregroundStyle(.white)
-                }
-            }
-            .font(.system(size: 15))
-            note("Tus datos se guardan en el dispositivo y funcionan sin conexión. La sincronización en la nube y la conexión con ChatGPT todavía no están activadas.")
-        }
-    }
+    private var syncCard: some View { CloudAccountView() }
 
     private var aboutCard: some View {
         AccountCard(title: "Acerca de", symbol: "info.circle") {
