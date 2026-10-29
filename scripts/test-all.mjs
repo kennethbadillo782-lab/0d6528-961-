@@ -5,6 +5,8 @@ import path from 'node:path';
 const root = fileURLToPath(new URL('../', import.meta.url));
 await mkdir(path.join(root, 'reports'), { recursive: true });
 const suites = [
+  ['ip-salt-derived', '.', ['--experimental-strip-types', '--import', './backend/supabase/functions/tests/e2e/register.mjs', 'scripts/test-ip-salt.mjs']],
+  ['ip-salt-custom', '.', ['--experimental-strip-types', '--import', './backend/supabase/functions/tests/e2e/register.mjs', 'scripts/test-ip-salt.mjs', '--custom']],
   ['utilities', 'backend/supabase/functions', ['--experimental-strip-types', 'tests/shared.test.ts']],
   ['api-flow-mocked-db', 'backend/supabase/functions/tests/e2e', ['--experimental-strip-types', '--import', './register.mjs', 'run.mjs']],
   ['api-security-mocked-db', 'backend/supabase/functions/tests/e2e', ['--experimental-strip-types', '--import', './register.mjs', 'attack.mjs']],

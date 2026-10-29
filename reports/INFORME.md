@@ -2,22 +2,26 @@
 
 ## Resultado y límites
 
-Se preparó una entrega reproducible para pruebas y compilación nativa. **El criterio final de éxito del usuario no se ha alcanzado**: no hay `.app`, `.ipa`, sesión Appetize ni comunicación de la app con Supabase. Faltan cuentas del usuario, ejecutor macOS, Docker para el stack Windows y la implementación de sincronización nativa. No se ejecutaron operaciones contra producción ni servicios con coste.
+Se preparó una entrega reproducible para pruebas y compilación nativa. **El criterio final de éxito del usuario no se ha alcanzado**: no hay `.app`, `.ipa`, sesión Appetize ni comunicación de la app con Supabase. Faltan cuentas del usuario, ejecutor macOS, reiniciar Windows para completar Docker/WSL y la implementación de sincronización nativa. No se ejecutaron operaciones contra producción ni servicios con coste.
 
 ## Evidencia ejecutada
 
 | Comprobación | Resultado | Evidencia | Alcance |
 |---|---|---|---|
 | Utilidades TypeScript | 15/15 | `utilities.log`, `node-tests.json` | Node 24.22.1 |
+| Sal de IP | 2/2 | `ip-salt-derived.log`, `ip-salt-custom.log` | Handler real con DB simulada |
 | Flujo de API | 27/27 | `api-flow-mocked-db.log` | Handler real, DB/red/DNS simulados |
 | Ataques de API | 154/154 | `api-security-mocked-db.log` | Handler real, DB/red/DNS simulados |
 | Migraciones y ataque SQL | 137/137 | `database.log`, `database.json` | PostgreSQL 16.15 real, Auth/Storage de prueba |
 | Concurrencia SQL | 20/60 aceptadas, esperado 20 | `database.json` | 60 conexiones reales |
 | Migración desde versión anterior | pasa | `database.json` | Se verifica caducidad de una clave antigua |
+| Limpieza/retención | pasa | `database.json`: `cleanupRetention` | Ejecutada en PostgreSQL real; conserva recientes y borra antiguos |
 | XSS web | 0 XSS, 0 URLs peligrosas, 0 errores JS | `web-xss.log` | Chromium; 120 pasos + 60 tras importación maliciosa; 20 acciones distintas |
 | Esquemas y configuración | pasan | `config-checks.log` | YAML/TOML/plist/XML estáticos |
 | Scripts | sintaxis válida | ver comandos de verificación | PowerShell, Bash, Python y Node; scripts nube/live sin ejecutar |
-| Supabase completo | bloqueado | CLI: Docker/Podman no encontrado | Sin Docker/WSL en Windows |
+| Comando único Windows | `Test-All.ps1` terminó con código 0 | `test-all-console.log` | Configuración, 2 pruebas de sal, 15 utilidades, 27 flujos, 154 ataques y SQL; omite explícitamente Supabase completo e iOS |
+| Docker/WSL | instalados; requieren reinicio | `windows-runtime.json`, `wsl-install.log` | Usuario autorizó los pasos administrativos; reinicio pendiente |
+| Supabase completo | no iniciado | Docker no pudo arrancar antes del reinicio | No equivale a un backend funcionando |
 | Compilación / XCTest / UI iOS | no ejecutados | no hay artefacto binario | Sin Mac ni cuenta CI |
 
 No sumar pruebas SQL con los tests de API para presentarlas como validación de un servicio desplegado. Los ataques con otra identidad son fixtures de regresión en DB descartables; no se añadió soporte multiusuario a la aplicación.
@@ -59,8 +63,8 @@ Se conserva el informe anterior como antecedente. Esta es la evidencia nueva; �
 | 14 | Errores sin detalles internos | Ataques API pasan |
 | 15 | Privilegios anónimos e historial | 137 ataques SQL pasan |
 | 16 | SVG en logos | SQL confirma MIME no permitido; Storage HTTP pendiente |
-| 17 | Sal de IPs | Revisión de fallback ligado a secreto y hashes en tests; secreto/proxy reales pendientes |
-| 18 | Limpieza de historial | Función y permisos presentes; programación y ejecución real de pg_cron pendientes |
+| 17 | Sal de IPs | Dos tests del handler verifican sal configurada y fallback ligado al secreto; secreto/proxy del despliegue pendientes |
+| 18 | Limpieza de historial | Se ejecutó api_cleanup en PostgreSQL real y se verificó retención; programación y ejecución real de pg_cron pendientes |
 
 También pasan los ataques adicionales de mínimo privilegio, presupuestos, separación de permisos, simetría de respuestas, concurrencia e historial incluidos en la entrega original. Esto no elimina los riesgos residuales de DNS rebinding descritos en `SEGURIDAD.md` ni demuestra protección absoluta contra prompt injection.
 
@@ -69,7 +73,7 @@ También pasan los ataques adicionales de mínimo privilegio, presupuestos, sepa
 1. Crear repositorio privado, Codemagic y Appetize; autorizar una ejecución macOS según la cuota de la cuenta.
 2. Compilar realmente; corregir errores de Xcode y ejecutar XCTest.
 3. Abrir el ZIP nativo en Appetize y ejecutar la matriz de UI.
-4. Instalar Docker/WSL y arrancar el stack, o autorizar un Supabase de pruebas separado. Ejecutar `Test-Live.ps1` y verificar Auth, Storage, DNS e IP reales.
+4. Reiniciar Windows, abrir Docker Desktop y arrancar el stack, o autorizar un Supabase de pruebas separado. Ejecutar `Test-Live.ps1` y verificar Auth, Storage, DNS e IP reales.
 5. Implementar login y sincronización nativos conforme a `AGENTS.md`, después de la primera compilación; probar offline, conflictos, fotos y borrados. Actualmente no existen en la app.
 6. Repetir auditoría de las 18 correcciones en el entorno real, verificar Security Advisor y cron.
 7. Configurar certificados/UDID/perfil Apple para la IPA y probar en iPhone físico.

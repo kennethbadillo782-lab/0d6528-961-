@@ -7,7 +7,9 @@ Se prepararon las herramientas, pruebas, configuración local y workflows de com
 ## Lo que ya se ejecutó en este PC
 
 - Node 24.22.1: 15 pruebas de utilidades, 27 de flujo y 154 ataques de API; todas pasan. La API ejecuta su código real, con Supabase, DNS y descargas sustituidos por dobles de prueba.
+- Dos pruebas adicionales verifican que el handler usa la sal de IP configurada o la derivada del secreto del servicio. Ambas pasan.
 - PostgreSQL 16.15 real: cuatro migraciones, 137 ataques, carrera de 60 conexiones con exactamente 20 aceptadas y actualización desde la versión anterior; todas pasan. Auth y Storage son esquemas de prueba, no sus servicios HTTP.
+- Una prueba adicional ejecutó `api_cleanup()` en PostgreSQL y verificó que elimina los registros antiguos y conserva los recientes de las tres tablas afectadas. La programación real de cron sigue pendiente.
 - Chromium: recorrido de 120 interacciones más 60 tras importar una copia maliciosa; cero XSS, enlaces peligrosos o errores JavaScript. Esta comprobación corresponde solo a la vista previa web.
 - Validación de YAML, TOML, plist, XML y sintaxis de scripts. No equivale a ejecutar los servicios ni a compilar Swift.
 
@@ -37,7 +39,9 @@ node scripts/test-all.mjs
 
 ## 2. Iniciar Supabase completo
 
-Este PC no tiene Docker Desktop ni WSL instalado. El comando de estado de Supabase confirmó ese bloqueo. Para habilitar el stack Windows hace falta instalar Docker Desktop con WSL2, contenedores Linux y completar los pasos administrativos o reinicio que Windows pida. No se han cambiado esas características del sistema.
+Se instalaron Docker Desktop 4.97.0 y WSL en este PC, con la autorización de administrador que completó el usuario. Windows confirmó que necesita **reiniciarse para aplicar los cambios**. No se reinició automáticamente. El stack Supabase aún no arrancó; el intento de iniciar Docker agotó su plazo mientras faltaba completar esos cambios.
+
+Después del reinicio, abre Docker Desktop, completa su primer arranque y comprueba que use contenedores Linux. En otro PC: instala Docker Desktop y WSL2 antes de continuar. `scripts/Enable-WSL.ps1` documenta el paso administrativo; en Windows PowerShell con scripts restringidos se puede lanzar localmente mediante `powershell -ExecutionPolicy RemoteSigned -File ./scripts/Enable-WSL.ps1`, desde una consola de administrador. Ese parámetro solo afecta al proceso y no cambia la política del sistema.
 
 Después:
 

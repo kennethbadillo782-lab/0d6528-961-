@@ -77,6 +77,7 @@ try {
   console.error(e.message?.startsWith('Falló:') ? e.message : 'No se completaron las pruebas reales. Revisa la instancia local.');
   process.exitCode = 1;
 } finally {
+  if (access && product) await rest(`products?id=eq.${product}`, { method: 'PATCH', body: { deleted_at: new Date().toISOString() } }).catch(() => {});
   if (access && keyId) await rest(`api_keys?id=eq.${keyId}`, { method: 'PATCH', body: { revoked_at: new Date().toISOString() } }).catch(() => {});
   await mkdir(new URL('reports/',root), { recursive: true });
   await writeFile(new URL('reports/live-tests.json',root), JSON.stringify({ at: new Date().toISOString(), environment: 'Supabase local real', results, nativeAppTested: false },null,2));

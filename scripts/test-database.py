@@ -72,6 +72,20 @@ try:
     (ROOT / 'reports/database.log').write_text('\n'.join(lines), encoding='utf-8')
     counts = sql(db, 'select count(*) filter (where ok), count(*) filter (where not ok) from t.results').split('|')
     assert int(counts[1]) == 0, counts
+    # Retención real: borra solo registros viejos y conserva los recientes.
+    sql(db, """
+      insert into public.api_usage values
+        ('aaaaaaaa-0000-4000-8000-000000000001','cleanup-old',now()-interval '4 days',1),
+        ('aaaaaaaa-0000-4000-8000-000000000001','cleanup-new',now(),1);
+      insert into public.api_auth_failures values ('cleanup-old',now()-interval '2 days',1),('cleanup-new',now(),1);
+      insert into public.api_audit_log(owner_id,operation,created_at) values
+        ('aaaaaaaa-0000-4000-8000-000000000001','cleanup-old',now()-interval '366 days'),
+        ('aaaaaaaa-0000-4000-8000-000000000001','cleanup-new',now());
+      select public.api_cleanup();
+    """)
+    for table, field in [('api_usage','bucket'),('api_auth_failures','ip_hash'),('api_audit_log','operation')]:
+        assert sql(db,f"select count(*) from public.{table} where {field}='cleanup-old'") == '0'
+        assert sql(db,f"select count(*) from public.{table} where {field}='cleanup-new'") == '1'
     sql(db, "update private.app_config set max_users=20; insert into auth.users values ('dddddddd-0000-4000-8000-000000000004','race@example.invalid')")
     def consume(_):
         return sql(db, "set role service_role; select public.api_consume('dddddddd-0000-4000-8000-000000000004','race',3600,20,1)")
@@ -84,7 +98,7 @@ try:
     sql(upgrade, "insert into auth.users values ('eeeeeeee-0000-4000-8000-000000000005','upgrade@example.invalid'); select public.create_api_key('old','{read,write}',null,'eeeeeeee-0000-4000-8000-000000000005') is not null")
     file(upgrade, migrations[-1])
     assert sql(upgrade,'select count(*) from public.api_keys where expires_at is null') == '0'
-    summary.update(status='passed', version=sql(db,'select version()'), attacksPassed=int(counts[0]), attacksFailed=int(counts[1]), concurrency={'requests':60,'accepted':accepted}, upgrade='passed')
+    summary.update(status='passed', version=sql(db,'select version()'), attacksPassed=int(counts[0]), attacksFailed=int(counts[1]), concurrency={'requests':60,'accepted':accepted}, upgrade='passed', cleanupRetention='passed')
     print(f'PASS PostgreSQL: {counts[0]} ataques; carrera 20/60; actualización correcta.', flush=True)
 finally:
     for name in names:

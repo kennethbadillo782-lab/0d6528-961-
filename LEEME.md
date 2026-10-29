@@ -1,5 +1,7 @@
 # Mi Catálogo de Moda — paquete completo
 
+> Preparación actualizada para Windows y pruebas nativas: empieza por `EMPEZAR-AQUI.md`. Docker y WSL se instalaron; Windows requiere reinicio. Los scripts y workflows están preparados, pero no hay una compilación iOS, sesión Appetize ni sincronización nativa verificadas. Resultados de pruebas en `reports/INFORME.md`.
+
 | Carpeta | Qué es | Estado |
 |---|---|---|
 | `ios/` | App de iPhone en SwiftUI + SwiftData (10 pantallas + Cuenta) | Hecha, guarda en el iPhone. Falta conectarla a la nube |
