@@ -1,6 +1,6 @@
 """Credenciales efímeras para XCTest: solo memoria y secretos cifrados del repo privado."""
 import subprocess,json,urllib.request
-cli='.tools/supabase.exe'; ref='ddppztnamwmryhamezwy'; repo='kennethbadillo782-lab/MiCatalogo'
+import os; cli=os.path.abspath('.tools/supabase.exe'); ref='ddppztnamwmryhamezwy'; repo='kennethbadillo782-lab/MiCatalogo'
 def tool(args):
  p=subprocess.run(args,capture_output=True,text=True)
  if p.returncode: raise SystemExit('Falló una operación de credenciales; salida sensible omitida.')

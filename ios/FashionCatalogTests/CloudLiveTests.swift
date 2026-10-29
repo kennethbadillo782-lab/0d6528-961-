@@ -30,11 +30,15 @@ final class CloudLiveTests: XCTestCase {
         let image = ProductImage(data:try XCTUnwrap(UIImage(systemName:"tshirt")?.pngData())); c.insert(image); p.images = [image]
         try c.save(); try sync.capturePending(context:c,owner:owner)
         var apiProductID: UUID?
+        var step = "inicio"
         do {
+            step = "sync inicial"
             try await sync.sync(context:c,transport:transport)
+            step = "fetch"
             let first = try await transport.fetch("products")
             XCTAssertTrue(first.contains { ($0["id"] as? String) == localID.uuidString.lowercased() && ($0["name"] as? String) == p.name })
             XCTAssertFalse(image.cloudPath.isEmpty)
+            step = "api chatgpt"
             var request = URLRequest(url:try XCTUnwrap(account.base?.appendingPathComponent("functions/v1/catalog-api/products")))
             request.httpMethod = "POST"; request.setValue(key,forHTTPHeaderField:"X-API-Key"); request.setValue("application/json",forHTTPHeaderField:"Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject:["name":"Desde ChatGPT API \(suffix)","original_url":"https://example.com/native-test/\(suffix)","category_key":"otros","images":[["url":"https://cdn.shopify.com/static/shopify-favicon.png"]]])
@@ -43,6 +47,7 @@ final class CloudLiveTests: XCTestCase {
             let json = try XCTUnwrap(JSONSerialization.jsonObject(with:data) as? CloudRow)
             let row = try XCTUnwrap(json["product"] as? CloudRow)
             apiProductID = UUID(uuidString:row["id"] as? String ?? "")
+            step = "sync tras api"
             try await sync.sync(context:c,transport:transport)
             let pulled = try XCTUnwrap(c.fetch(FetchDescriptor<Product>()).first { $0.id == apiProductID })
             XCTAssertTrue(pulled.name.hasPrefix("Desde ChatGPT API"))
@@ -51,14 +56,17 @@ final class CloudLiveTests: XCTestCase {
             try await sync.sync(context:c,transport:transport)
             let rows = try await transport.fetch("products")
             XCTAssertTrue(rows.contains { ($0["id"] as? String) == pulled.id.uuidString.lowercased() && ($0["notes"] as? String) == "Editado en Swift ñ" })
+            step = "segunda cache"
             // Otra caché SwiftData descarga fotos privadas y ve ambos productos.
             let second = try ModelContainer(for:schema,configurations:[ModelConfiguration(schema:schema,isStoredInMemoryOnly:true)])
             try await CatalogSync().sync(context:second.mainContext,transport:transport)
             let photoProduct = try XCTUnwrap(second.mainContext.fetch(FetchDescriptor<Product>()).first { $0.id == localID })
             XCTAssertNotNil(photoProduct.images.first?.data)
+            step = "borrado"
             c.delete(p); c.delete(pulled); try c.save(); try await sync.sync(context:c,transport:transport)
             let deleted = try await transport.fetch("products")
             XCTAssertTrue(deleted.contains { ($0["id"] as? String) == localID.uuidString.lowercased() && $0["deleted_at"] is String })
+            step = "signOut"
             try await client.auth.signOut(); account.email = nil
             XCTAssertNil(client.auth.currentSession)
             XCTAssertNil(try CatalogKeychain().retrieve(key:"sb-ddppztnamwmryhamezwy-auth-token"))
@@ -70,6 +78,7 @@ final class CloudLiveTests: XCTestCase {
                 }
             }
             try? await client.auth.signOut(); account.email = nil
+            XCTFail("paso fallido: \(step)")
             throw error
         }
         UserDefaults.standard.removeObject(forKey:"catalog.cloud.owner")
