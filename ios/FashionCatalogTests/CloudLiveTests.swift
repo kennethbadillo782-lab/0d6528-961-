@@ -18,7 +18,7 @@ final class CloudLiveTests: XCTestCase {
         let owner = session.user.id.uuidString.lowercased()
         account.email = session.user.email
         UserDefaults.standard.removeObject(forKey:"catalog.cloud.owner")
-        let schema = Schema([Product.self, ProductImage.self, ProductCollection.self, CatalogCategory.self, CloudSyncEntry.self])
+        let schema = Schema([Product.self, ProductImage.self, ProductCollection.self, CatalogCategory.self, CloudSyncEntry.self, CloudRemoteCache.self])
         let container = try ModelContainer(for:schema,configurations:[ModelConfiguration(schema:schema,isStoredInMemoryOnly:true)])
         let c = container.mainContext; let transport = SupabaseCatalogTransport(account:account,owner:owner); let sync = CatalogSync()
         let suffix = UUID().uuidString

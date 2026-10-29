@@ -14,6 +14,15 @@ final class CloudSyncEntry {
     init(owner: String, table: String, key: String) { self.owner = owner; self.table = table; self.rowKey = key }
 }
 
+@Model
+final class CloudRemoteCache {
+    var owner: String = ""
+    var table: String = ""
+    var rowsData: Data = Data()
+    var cursor: String?
+    init(owner: String, table: String) { self.owner = owner; self.table = table }
+}
+
 typealias CloudRow = [String: Any]
 struct CloudSnapshot {
     let table: String

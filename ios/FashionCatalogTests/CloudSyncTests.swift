@@ -27,7 +27,7 @@ final class MemoryCloud: CatalogCloudTransport {
 final class CloudSyncTests: XCTestCase {
     @MainActor private func store() throws -> ModelContainer {
         UserDefaults.standard.removeObject(forKey:"catalog.cloud.owner")
-        let schema = Schema([Product.self, ProductImage.self, ProductCollection.self, CatalogCategory.self, CloudSyncEntry.self])
+        let schema = Schema([Product.self, ProductImage.self, ProductCollection.self, CatalogCategory.self, CloudSyncEntry.self, CloudRemoteCache.self])
         return try ModelContainer(for:schema,configurations:[ModelConfiguration(schema:schema,isStoredInMemoryOnly:true)])
     }
     @MainActor

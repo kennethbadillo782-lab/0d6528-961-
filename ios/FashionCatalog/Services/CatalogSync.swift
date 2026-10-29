@@ -8,9 +8,14 @@ import Supabase
 protocol CatalogCloudTransport {
     var owner: String { get }
     func fetch(_ table: String) async throws -> [CloudRow]
+    func fetchChanges(_ table: String, since: String?) async throws -> [CloudRow]
     func write(_ table: String, row: CloudRow, previous: String?) async throws -> CloudRow
     func upload(_ data: Data, path: String) async throws
     func download(_ path: String) async throws -> Data
+}
+
+extension CatalogCloudTransport {
+    func fetchChanges(_ table: String, since: String?) async throws -> [CloudRow] { try await fetch(table) }
 }
 
 @MainActor
@@ -31,11 +36,13 @@ final class SupabaseCatalogTransport: CatalogCloudTransport {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw CloudError.rejected((response as? HTTPURLResponse)?.statusCode ?? 0) }
         return data
     }
-    func fetch(_ table: String) async throws -> [CloudRow] {
+    func fetch(_ table: String) async throws -> [CloudRow] { try await fetchChanges(table,since:nil) }
+    func fetchChanges(_ table: String, since: String?) async throws -> [CloudRow] {
         guard CloudMapping.tables.contains(table) else { throw CloudError.invalidData }
         var rows: [CloudRow] = []; var offset = 0
         while true {
-            let q = [URLQueryItem(name:"select",value:"*"),URLQueryItem(name:"owner_id",value:"eq.\(owner)"),URLQueryItem(name:"order",value:table == "categories" ? "key.asc" : table == "product_collections" ? "product_id.asc,collection_id.asc" : "id.asc"),URLQueryItem(name:"limit",value:"200"),URLQueryItem(name:"offset",value:String(offset))]
+            var q = [URLQueryItem(name:"select",value:"*"),URLQueryItem(name:"owner_id",value:"eq.\(owner)"),URLQueryItem(name:"order",value:table == "categories" ? "key.asc" : table == "product_collections" ? "product_id.asc,collection_id.asc" : "id.asc"),URLQueryItem(name:"limit",value:"200"),URLQueryItem(name:"offset",value:String(offset))]
+            if let since { q.append(.init(name:"updated_at",value:"gte.\(since)")) }
             let data = try await request("rest/v1/\(table)",query:q)
             guard let page = try JSONSerialization.jsonObject(with:data) as? [CloudRow] else { throw CloudError.invalidData }
             rows += page; if page.count < 200 { return rows }; offset += 200
@@ -96,7 +103,20 @@ final class CatalogSync: ObservableObject {
         UserDefaults.standard.set(owner,forKey:"catalog.cloud.owner")
         try capturePending(context:context,owner:owner)
         var remote: [String:[CloudRow]] = [:]
-        for table in CloudMapping.tables { remote[table] = try await transport.fetch(table) }
+        var caches = try context.fetch(FetchDescriptor<CloudRemoteCache>()).filter { $0.owner == owner }
+        for table in CloudMapping.tables {
+            let cache = caches.first { $0.table == table } ?? CloudRemoteCache(owner:owner,table:table)
+            if !caches.contains(where: { $0.table == table }) { context.insert(cache); caches.append(cache) }
+            let previous = cache.rowsData.isEmpty ? [] : ((try JSONSerialization.jsonObject(with:cache.rowsData)) as? [CloudRow] ?? [])
+            let overlap = CloudMapping.date(cache.cursor).map { CloudMapping.stamp($0.addingTimeInterval(-2)) }
+            let changes = try await transport.fetchChanges(table,since:overlap)
+            var combined = Dictionary(previous.map { (CloudMapping.key($0,table:table),$0) },uniquingKeysWith: { _,b in b })
+            for row in changes { combined[CloudMapping.key(row,table:table)] = row }
+            remote[table] = Array(combined.values)
+            cache.rowsData = try JSONSerialization.data(withJSONObject:Array(combined.values))
+            if let newest = changes.compactMap({ CloudMapping.date($0["updated_at"]) }).max() { cache.cursor = CloudMapping.stamp(newest) }
+        }
+        try context.save()
         // Fusionar por nombre la colección sembrada al primer login; nunca crear dos "Lista principal".
         for c in try context.fetch(FetchDescriptor<ProductCollection>()) {
             if !allEntries.contains(where: { $0.table == "collections" && $0.rowKey == c.id.uuidString.lowercased() && !$0.remoteStamp.isEmpty }),
@@ -154,6 +174,10 @@ final class CatalogSync: ObservableObject {
                     if snapshot == nil && r == nil { entry?.isDeleted = true; entry?.pendingSince = nil; continue }
                     let written = try await transport.write(table,row:row,previous:r?["updated_at"] as? String)
                     entry?.remoteStamp = written["updated_at"] as? String ?? ""
+                    if let cache = caches.first(where: { $0.table == table }) {
+                        var cached = remote[table] ?? []; cached.removeAll { CloudMapping.key($0,table:table) == key }; cached.append(written)
+                        remote[table] = cached; cache.rowsData = try JSONSerialization.data(withJSONObject:cached)
+                    }
                 } else { continue }
                 // Guardar la huella exacta del estado recibido/enviado, sin absorber ediciones concurrentes.
                 let current = try CloudMapping.snapshots(context).first { $0.table == table && $0.key == key }
