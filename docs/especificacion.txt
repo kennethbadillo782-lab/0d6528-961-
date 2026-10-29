@@ -1,0 +1,1079 @@
+PROYECTO: MI CATÁLOGO DE MODA
+
+Especificación completa de diseño y desarrollo para iPhone
+
+1. Objetivo principal
+
+Quiero desarrollar una aplicación personal para iPhone basada en la imagen de referencia adjunta.
+
+La aplicación será un catálogo privado de ropa, accesorios, joyería, calzado y artículos de moda que quiero comprar en el futuro.
+
+No es una tienda online, no necesito vender productos y no necesito un sistema de pagos dentro de la aplicación.
+
+El propósito es descubrir, añadir, guardar, organizar, filtrar y consultar todos los productos que voy encontrando por internet.
+
+Por ejemplo, puedo encontrar una cartera en Hipobuy, unos pantalones en Taobao o unas pantallas en otra tienda. Quiero poder guardar cada artículo con sus fotografías, precio, vendedor, enlace de compra y características, y encontrarlo posteriormente con facilidad.
+
+La aplicación debe funcionar como una mezcla entre una tienda de moda moderna y una lista de deseos personal, con una experiencia muy visual.
+
+2. Requisito fundamental: diseño
+
+La imagen adjunta contiene 10 pantallas que representan el diseño aprobado.
+
+No quiero un rediseño, otra paleta de colores ni una interpretación genérica.
+
+Debes replicar lo más fielmente posible:
+
+* La distribución de los elementos.
+* Las proporciones de las fotografías.
+* El tamaño y estilo de las tarjetas.
+* La navegación inferior.
+* Las barras de búsqueda.
+* Las etiquetas de filtros.
+* Los botones redondeados.
+* El espaciado y las jerarquías visuales.
+* La apariencia oscura y minimalista.
+
+La referencia muestra una app negra, elegante, moderna, con fotografías grandes y controles compactos.
+
+Quiero que se sienta como una aplicación real de iOS de alta calidad, no como una página web genérica introducida dentro de un teléfono.
+
+3. Tecnología y dispositivo
+
+Dispositivo principal: iPhone 17 Pro Max.
+
+Preferencia técnica: Swift y SwiftUI, para una aplicación nativa de iOS.
+
+Requisitos:
+
+* Modo oscuro permanente.
+* Adaptación a las áreas seguras del iPhone y Dynamic Island.
+* Navegación fluida y transiciones nativas.
+* Desplazamiento vertical suave.
+* Animaciones discretas.
+* Interfaz táctil cómoda.
+* Fotografías de alta calidad.
+* Persistencia real de los productos.
+* Funcionamiento sin conexión para los datos guardados localmente.
+* Arquitectura preparada para incorporar sincronización en la nube posteriormente.
+
+Para la primera versión se puede utilizar SwiftData como almacenamiento local. Si posteriormente necesito sincronización entre dispositivos o integración con ChatGPT, podremos incorporar un backend.
+
+⸻
+
+4. SISTEMA VISUAL
+
+Paleta de colores
+
+Usar los siguientes colores como orientación, ajustándolos para coincidir lo mejor posible con la fotografía:
+
+Elemento	Color aproximado
+Fondo principal	#080B0E
+Tarjetas	#1B1F24
+Barras de búsqueda	#20242A
+Texto principal	#FFFFFF
+Texto secundario	#A0A5AD
+Botones de filtro	#24282D
+Azul de selección	#287BFF
+Corazones activos	#F04C79
+Bordes discretos	#30343A
+
+No crear contornos blancos gruesos, sombras exageradas ni degradados innecesarios.
+
+Los elementos deben separarse utilizando principalmente espacio, contraste y superficies ligeramente distintas.
+
+Tipografía
+
+Usar el sistema tipográfico nativo de Apple: SF Pro.
+
+* Encabezados principales: semibold o bold.
+* Títulos de producto: semibold.
+* Precios: medium o semibold.
+* Descripciones: regular.
+* Etiquetas pequeñas: regular o medium.
+
+La aplicación debe tener una excelente legibilidad sin desperdiciar demasiado espacio.
+
+Tarjetas de producto
+
+Cada artículo se presenta utilizando una tarjeta que contiene:
+
+1. Fotografía principal grande.
+2. Corazón en la esquina superior derecha.
+3. Nombre del producto.
+4. Precio.
+5. Información adicional cuando corresponda.
+
+Las fotografías deben ocupar la mayor parte de la tarjeta.
+
+La cuadrícula principal utilizará dos columnas en iPhone, como aparece en la imagen.
+
+⸻
+
+5. PANTALLA 1 — INICIO
+
+Es la primera pantalla, situada arriba a la izquierda en la imagen.
+
+Encabezado
+
+Arriba aparece:
+
+Inicio
+
+A su derecha, un icono de notificaciones.
+
+Debajo, una barra de búsqueda horizontal con una lupa y el texto:
+
+“Buscar productos, marcas o links…”
+
+Esta barra permitirá buscar en los productos guardados utilizando nombres, marcas, categorías y vendedores. También se podrá detectar cuando el usuario pegue un enlace.
+
+Accesos rápidos
+
+Debajo aparece una fila horizontal de categorías con iconos:
+
+* Todo
+* Ropa
+* Zapatos
+* Carteras
+* Accesorios
+
+Las categorías deben tener iconos de línea sencillos y etiquetas pequeñas debajo.
+
+La categoría seleccionada utiliza un fondo claro o un estado visual destacado.
+
+Marcas populares
+
+Título: Marcas populares
+
+Debajo hay tarjetas cuadradas con nombres o logotipos de marcas como:
+
+* Louis Vuitton
+* Gucci
+* Dior
+* Coach
+* Nike
+
+Estas tarjetas son filtros del catálogo personal. No representan necesariamente conexiones oficiales con las marcas.
+
+Al seleccionar una marca, deben aparecer los productos guardados que correspondan a ella.
+
+La fila debe poder desplazarse horizontalmente.
+
+Categorías principales
+
+Título: Categorías
+
+Debajo, una cuadrícula de tarjetas con fotografías y texto superpuesto.
+
+La referencia muestra:
+
+* Camisas
+* Pantalones
+* Carteras
+* Zapatos
+* Pantallas
+* Gorras
+* Relojes
+* Más
+
+Cada tarjeta tiene bordes redondeados, fotografía de fondo y título blanco situado hacia la parte inferior.
+
+Al tocar cualquier tarjeta, se abre su categoría.
+
+La opción “Más” presenta todas las categorías adicionales disponibles.
+
+⸻
+
+6. PANTALLA 2 — ROPA
+
+Segunda pantalla de la primera fila.
+
+Encabezado centrado:
+
+Ropa
+
+Botón de regresar arriba a la izquierda.
+
+Debajo aparece una barra de búsqueda específica de ropa.
+
+Subcategorías
+
+Fila horizontal de botones:
+
+* Camisas
+* Pantalones
+* Hoodies
+* Chaquetas
+
+Cada uno tiene sus propias subcategorías.
+
+Cuando selecciono Camisas, aparece otra fila:
+
+* Todas
+* T-Shirts
+* Polo
+* Mangas largas
+
+También quiero admitir camisas de botones, manga corta, oversize y otras variantes.
+
+Productos
+
+Debajo aparece una cuadrícula de dos columnas.
+
+Cada producto contiene fotografía, botón de favorito, nombre y precio.
+
+La lista debe poder desplazarse verticalmente sin perder la barra de navegación inferior.
+
+Tocar un producto abre su página de detalle.
+
+⸻
+
+7. PANTALLA 3 — PANTALONES
+
+Tercera pantalla de la fila superior.
+
+Es especialmente importante porque quiero que cada categoría tenga sus propios filtros.
+
+Encabezado:
+
+Pantalones
+
+Debajo aparece una barra de búsqueda.
+
+Selector visual de estilos
+
+Justo debajo de la búsqueda aparecen pequeñas tarjetas horizontales con una fotografía y una etiqueta:
+
+* Largos
+* Cortos
+* Cargo
+* Jeans
+
+La fila es desplazable horizontalmente y permite añadir otros estilos.
+
+Filtros rápidos
+
+Debajo aparecen botones tipo píldora:
+
+* Todos
+* Jeans
+* Cargo
+* Shorts
+* Jogger
+
+La categoría tiene un botón adicional para abrir los filtros completos.
+
+Filtros avanzados para pantalones
+
+Incluir:
+
+Largo: largos, cortos, capri y bermudas.
+
+Tipo: jeans, cargo, jogger, chino, deportivo, formal y otros.
+
+Corte: skinny, slim, regular, straight, relaxed, baggy y wide-leg.
+
+Cintura: tallas numéricas, letras y medidas cuando estén disponibles.
+
+Color: negro, azul, blanco, gris, beige, verde y otros.
+
+Marca, material, rango de precio y vendedor.
+
+Los filtros se combinan correctamente. Si selecciono “Corto + Negro + Nike”, solo deben aparecer los artículos que cumplan esas condiciones.
+
+Debajo se presenta la cuadrícula de productos.
+
+⸻
+
+8. PANTALLA 4 — CARTERAS
+
+Cuarta pantalla de la fila superior.
+
+Encabezado:
+
+Carteras
+
+Barra de búsqueda específica.
+
+Filtros superiores
+
+* Todas
+* Crossbody
+* Backpack
+* Billetera
+* Tote
+* Shoulder Bag
+* Messenger
+* Camera Bag
+
+Las opciones deben desplazarse horizontalmente.
+
+Vista de productos
+
+Cuadrícula de dos columnas con fotografías grandes.
+
+Cada tarjeta muestra el producto, nombre, precio y corazón para guardarlo como favorito.
+
+Filtros especiales
+
+* Marca
+* Tipo
+* Tamaño
+* Color
+* Material
+* Número de compartimentos
+* Precio
+* Vendedor
+* Agente de compra
+
+Quiero que pueda guardar dimensiones como ancho, alto y profundidad.
+
+También quiero conservar fotografías reales de inspección QC cuando estén disponibles.
+
+⸻
+
+9. PANTALLA 5 — PANTALLAS / ARETES
+
+Quinta pantalla de la fila superior.
+
+Encabezado:
+
+Pantallas
+
+Debajo, barra de búsqueda.
+
+Filtros de estilos
+
+* Todas
+* Redondas
+* Cuadradas
+* Halo
+* Cluster
+* Solitarias
+* Iced Out
+
+Filtros de tamaño
+
+Botones como en la imagen:
+
+* 3 mm
+* 5 mm
+* 6 mm
+* 8 mm
+* 10 mm+
+
+También debe ser posible almacenar medidas intermedias como 6.5, 7 y 9 mm.
+
+Color
+
+El selector de color será visual, usando pequeños círculos de distintos acabados y colores.
+
+Material
+
+* Moissanita
+* Zirconia cúbica
+* Plata 925
+* Oro
+* Acero inoxidable
+* Otros
+
+Los filtros deben distinguir el metal de la montura y el tipo de piedra, porque son características diferentes.
+
+Otros filtros:
+
+* Tipo de cierre
+* Piedra central o múltiples piedras
+* Forma
+* Precio
+* Diámetro
+
+Productos
+
+Mostrar fotografías grandes de las pantallas.
+
+Además de las fotos normales, permitir guardar fotografías donde aparezcan puestas en una oreja, para evaluar el tamaño visual.
+
+Cuando existan varias imágenes, el usuario podrá navegar entre ellas en la página de detalles.
+
+⸻
+
+10. PANTALLA 6 — DETALLES DEL PRODUCTO
+
+Primera pantalla de la fila inferior de la imagen.
+
+Esta página se abre al tocar cualquier producto.
+
+Parte superior
+
+* Flecha para regresar.
+* Título “Producto”.
+* Corazón para marcar favorito.
+
+Galería principal
+
+Una fotografía grande ocupa casi todo el ancho disponible.
+
+Debajo aparece una fila horizontal de miniaturas.
+
+Al tocar una miniatura, cambia la fotografía principal.
+
+Al tocar la fotografía grande, puede abrirse un visor a pantalla completa con zoom.
+
+Permitir:
+
+* Fotografías oficiales del anuncio.
+* Fotografías QC.
+* Fotografías de compradores.
+* Fotografías del producto puesto.
+* Fotografías subidas manualmente.
+
+Información principal
+
+Mostrar:
+
+Nombre del producto
+
+Precio actual.
+
+Precio anterior, únicamente si existe un precio anterior verificable.
+
+Porcentaje de descuento, calculado solo cuando los datos sean válidos.
+
+Etiquetas de características:
+
+* Material
+* Calidad declarada
+* Color
+* Talla
+* Accesorios incluidos
+
+Las etiquetas como “1:1” o “Top Quality” deben identificarse como afirmaciones del vendedor, no como calidad garantizada por la aplicación.
+
+Vendedor
+
+Mostrar un bloque con:
+
+* Nombre del vendedor.
+* Plataforma de origen.
+* Valoración, solamente si existe una valoración real comprobable.
+* Enlace original.
+* Notas personales sobre calidad.
+
+Agentes de compra
+
+La imagen muestra botones para abrir el producto en agentes como:
+
+* Hipobuy
+* Sugargoo
+* KakoBuy
+* CSSBuy
+
+Estos botones deben abrir enlaces válidos cuando estén disponibles.
+
+Si no existe una conversión compatible, ofrecer abrir el enlace original o copiarlo. No inventar URL.
+
+Botón inferior
+
+Botón blanco grande:
+
+Guardar en colección
+
+Si el artículo ya está guardado, mostrar:
+
+“Editar producto” o “Guardado”.
+
+La página también debe permitir modificar talla, color, prioridad, estado de compra y notas personales.
+
+⸻
+
+11. PANTALLA 7 — AGREGAR PRODUCTO
+
+Segunda pantalla de la fila inferior.
+
+Encabezado:
+
+Agregar producto
+
+Esta pantalla es fundamental porque quiero añadir artículos continuamente.
+
+Tres métodos principales
+
+Método 1: Pegar enlace
+
+El usuario pega una URL de Taobao, Weidian, 1688, Yupoo, Hipobuy u otra página.
+
+Debajo aparece el botón:
+
+“Detectar información”.
+
+La aplicación intentará extraer:
+
+* Nombre.
+* Fotografías.
+* Precio.
+* Moneda.
+* Vendedor.
+* Plataforma.
+* Categoría.
+* Variantes disponibles.
+
+Si una página bloquea la extracción automática, permitir introducir o corregir manualmente todos los datos.
+
+Método 2: Subir fotos
+
+El usuario selecciona imágenes de la galería del iPhone.
+
+Puede guardar un artículo aunque todavía no tenga su enlace de compra.
+
+Esto es importante para guardar capturas de TikTok, Instagram y otros lugares.
+
+Método 3: Búsqueda
+
+Permitir buscar entre los productos que ya tiene guardados.
+
+En una versión posterior se podrá incorporar búsqueda externa mediante una API o servicio compatible.
+
+No asumir que todos los marketplaces ofrecen búsqueda pública automatizada.
+
+Datos editables
+
+* Nombre.
+* Marca.
+* Categoría y subcategoría.
+* Fotos.
+* Precio.
+* Moneda.
+* Enlace.
+* Agente.
+* Vendedor.
+* Talla.
+* Color.
+* Material.
+* Notas.
+* Estado de compra.
+* Colección.
+
+Selección de colección
+
+La imagen muestra:
+
+“Guardar en colección”
+
+Debajo una fila que permite elegir, por ejemplo, “Carteras”.
+
+El usuario podrá elegir una o varias colecciones.
+
+Notas personales
+
+Campo para escribir comentarios como:
+
+“Quiero el color negro”.
+
+“Comprar talla L”.
+
+“Esperar a conseguir más dinero”.
+
+“Comparar con el vendedor anterior”.
+
+Botón final
+
+Guardar producto
+
+Debe guardar los datos realmente, no solamente modificar la apariencia de la pantalla.
+
+⸻
+
+12. PANTALLA 8 — GUARDADOS
+
+Tercera pantalla de la fila inferior.
+
+Encabezado:
+
+Guardados
+
+Icono + para añadir un nuevo producto.
+
+Filtros horizontales
+
+* Todos
+* Carteras
+* Camisas
+* Pantalones
+* Otras categorías
+
+Diseño de lista
+
+A diferencia del catálogo principal, aquí aparecen filas horizontales compactas.
+
+Cada fila debe mostrar:
+
+* Miniatura.
+* Nombre.
+* Precio.
+* Plataforma o agente.
+* Fecha de guardado.
+* Icono de favorito.
+
+La pantalla debe poder ordenarse por:
+
+* Más recientes.
+* Más antiguos.
+* Precio menor.
+* Precio mayor.
+* Prioridad.
+* Pendientes de comprar.
+
+Estados de cada producto
+
+Quiero poder clasificar cada artículo en:
+
+* Por investigar.
+* Favorito.
+* Pendiente de comprar.
+* Listo para comprar.
+* Comprado.
+* Descartado.
+
+Los artículos comprados deben conservarse en el historial, salvo que los elimine.
+
+Permitir cambiar su estado y gestionar productos sin perder sus enlaces.
+
+⸻
+
+13. PANTALLA 9 — COLECCIONES
+
+Cuarta pantalla de la fila inferior.
+
+Encabezado:
+
+Colecciones
+
+Icono + para crear una colección.
+
+Debajo, selector:
+
+“Mis colecciones” / “Favoritos”.
+
+Diseño de colecciones
+
+Cuadrícula de dos columnas.
+
+Cada colección es una tarjeta grande con fotografía de portada.
+
+Ejemplos:
+
+* Lista principal.
+* Carteras.
+* Camisas.
+* Pantalones.
+* Pantallas.
+* Gorras.
+
+Cada tarjeta muestra:
+
+* Imagen de portada.
+* Nombre.
+* Número real de productos.
+
+Las fotografías de portada pueden utilizar automáticamente un producto guardado o una imagen escogida manualmente.
+
+Gestión
+
+Permitir:
+
+* Crear colecciones.
+* Renombrarlas.
+* Cambiar su portada.
+* Añadir y quitar productos.
+* Eliminarlas con confirmación.
+* Ordenarlas.
+
+Eliminar una colección no debe eliminar los productos originales, a menos que el usuario lo solicite expresamente.
+
+Un producto puede pertenecer a varias colecciones.
+
+⸻
+
+14. PANTALLA 10 — FILTROS AVANZADOS
+
+Quinta pantalla de la fila inferior.
+
+La imagen muestra un panel de filtros para pantalones.
+
+Encabezado:
+
+Filtros (Pantalones)
+
+Arriba:
+
+“Cancelar” a la izquierda y “Aplicar” a la derecha en azul.
+
+Diseño
+
+Fondo negro.
+
+Secciones compactas.
+
+Controles con bordes redondeados.
+
+Los elementos seleccionados se resaltan con azul.
+
+Tipo
+
+Pequeñas tarjetas con fotografías:
+
+* Largos.
+* Cortos.
+* Cargo.
+* Jeans.
+* Jogger.
+* Rectos.
+* Anchos.
+* Técnicos.
+
+Marca
+
+Tarjetas con el nombre o logotipo de la marca.
+
+Talla
+
+Botones:
+
+XS, S, M, L, XL, XXL.
+
+Para pantalones también se admiten tallas numéricas.
+
+Color
+
+Muestras circulares de colores.
+
+Precio
+
+Control deslizante para establecer un intervalo de precios.
+
+Usar un rango dinámico basado en los productos disponibles.
+
+Comportamiento
+
+El panel debe poder desplazarse verticalmente.
+
+Al tocar “Aplicar”, se muestran los artículos coincidentes.
+
+Al tocar “Cancelar”, se descartan los cambios no aplicados.
+
+Añadir botón “Limpiar filtros”.
+
+Cada categoría debe tener sus propios filtros relevantes, sin mostrar opciones que no tengan sentido.
+
+⸻
+
+15. BARRA DE NAVEGACIÓN INFERIOR
+
+Se mantiene visible en las pantallas principales.
+
+La referencia muestra cinco pestañas:
+
+1. Inicio — icono de casa.
+2. Explorar — icono de lupa.
+3. Guardados — icono de marcador.
+4. Colecciones — icono de carpeta.
+5. Cuenta — icono de usuario.
+
+El icono seleccionado se ilumina en azul.
+
+Los demás aparecen en gris o blanco tenue.
+
+La barra tiene fondo oscuro, está integrada en la zona inferior y respeta el indicador de inicio del iPhone.
+
+Las pantallas secundarias, como detalles, formularios y filtros, pueden abrirse mediante navegación nativa o presentaciones modales.
+
+Pantalla Cuenta
+
+Aunque no está desarrollada visualmente en la referencia, debe seguir exactamente el mismo estilo.
+
+Incluir:
+
+* Preferencias de moneda.
+* Configuración de visualización.
+* Opciones de copia de seguridad.
+* Importar y exportar productos.
+* Estado de sincronización.
+* Acerca de la aplicación.
+
+No es necesario implementar una cuenta online para utilizar la primera versión local.
+
+⸻
+
+16. ESTRUCTURA COMPLETA DEL CATÁLOGO
+
+Crear un sistema de categorías extensible, no una lista fija difícil de modificar.
+
+Las categorías iniciales serán:
+
+Categoría	Subcategorías
+Camisas	T-Shirts, polos, manga larga, manga corta, botones, oversize
+Pantalones	Jeans, cargo, shorts, joggers, chinos, formales
+Abrigos	Hoodies, jackets, suéteres, rompevientos
+Zapatos	Sneakers, botas, sandalias, formales
+Carteras	Crossbody, messenger, camera bag, backpack, tote, billeteras
+Pantallas	Redondas, cuadradas, halo, cluster, iced out
+Joyería	Cadenas, collares, pulseras, anillos
+Gorras	Baseball, trucker, fitted, snapback
+Relojes	Deportivos, clásicos, digitales
+Gafas	Sol, ópticas, deportivas
+Otros	Correas, accesorios y artículos personalizados
+
+Debe ser posible añadir más categorías y atributos posteriormente.
+
+⸻
+
+17. MODELO DE DATOS
+
+Cada producto necesita al menos los siguientes campos:
+
+id
+nombre
+marca
+categoria
+subcategoria
+descripcion
+precioActual
+precioAnterior
+moneda
+urlOriginal
+urlAgente
+nombreAgente
+nombreVendedor
+imagenes[]
+imagenesQC[]
+color
+talla
+material
+atributosEspecificos{}
+calidadDeclarada
+calidadVerificada
+notas
+favorito
+prioridad
+estadoCompra
+colecciones[]
+fechaGuardado
+fechaActualizacion
+
+Los atributos específicos deben permitir representar características distintas según el artículo.
+
+Ejemplo:
+
+Para unos pantalones: largo, tipo de corte y cintura.
+
+Para unas pantallas: tamaño en milímetros, tipo de piedra y metal.
+
+Para una cartera: dimensiones y compartimentos.
+
+Se necesita un identificador único para evitar duplicados accidentales.
+
+Los productos guardados deben poder editarse, eliminarse y recuperarse desde el almacenamiento correspondiente.
+
+⸻
+
+18. MONEDAS Y PRECIOS
+
+Vivo en Puerto Rico, así que prefiero utilizar USD ($) como moneda principal.
+
+Sin embargo, muchos productos proceden de China y tendrán precios en yuanes (CNY).
+
+Quiero poder almacenar:
+
+* Precio original en su moneda.
+* Precio equivalente en USD.
+* Costo estimado de envío.
+* Costo final estimado.
+
+Las conversiones deben mostrar cuándo se actualizó el tipo de cambio.
+
+Si no existe un tipo de cambio disponible, presentar el precio original sin inventar una conversión exacta.
+
+No necesito un sistema de checkout. Las compras se harán en las páginas externas.
+
+⸻
+
+19. EXPERIENCIA DE USUARIO
+
+La aplicación debe sentirse rápida, agradable y terminada.
+
+Interacciones
+
+* Tocar un producto abre sus detalles.
+* Tocar un corazón activa o desactiva favorito inmediatamente.
+* Mantener pulsado un producto puede abrir un menú de acciones.
+* Las colecciones permiten añadir múltiples artículos.
+* Las búsquedas y filtros se actualizan sin retrasos innecesarios.
+* Los formularios conservan los datos hasta guardar o cancelar.
+* Los botones ofrecen retroalimentación táctil discreta cuando corresponda.
+
+Estados especiales
+
+Crear pantallas apropiadas para:
+
+* Catálogo vacío.
+* Sin resultados de búsqueda.
+* Error al cargar imágenes.
+* Enlace no compatible.
+* Producto duplicado.
+* Falta de conexión.
+* Producto guardado correctamente.
+* Confirmación antes de eliminar.
+
+Evitar pantallas vacías sin explicación y botones que no hagan nada.
+
+Rendimiento
+
+Utilizar carga diferida de fotografías, caché de imágenes y listas eficientes.
+
+Debe poder almacenar cientos o miles de productos sin degradarse de forma notable.
+
+⸻
+
+20. FUTURA INTEGRACIÓN CON CHATGPT
+
+Este requisito es importante para el proyecto completo, aunque no necesita estar terminado en la primera versión.
+
+Quiero poder conversar con ChatGPT y decir:
+
+“Busca 10 carteras negras y guárdame las mejores en mi aplicación”.
+
+El objetivo futuro es que los artículos lleguen al catálogo sin tener que introducirlos manualmente uno por uno.
+
+Para permitirlo, diseñar la arquitectura de forma que posteriormente pueda ofrecer una API autenticada para:
+
+* Crear productos.
+* Modificar productos.
+* Consultar productos.
+* Añadir imágenes.
+* Gestionar colecciones.
+* Marcar favoritos.
+
+La sincronización externa no debe considerarse implementada hasta conectar y probar realmente esos servicios.
+
+Por ahora, priorizar la entrada manual por enlaces y fotografías.
+
+⸻
+
+21. ORGANIZACIÓN DEL PROYECTO
+
+Utilizar una estructura modular, por ejemplo:
+
+FashionCatalog/
+│
+├── App/
+│   └── FashionCatalogApp.swift
+│
+├── Models/
+│   ├── Product.swift
+│   ├── Category.swift
+│   ├── Collection.swift
+│   └── ProductAttributes.swift
+│
+├── Views/
+│   ├── Home/
+│   ├── Explore/
+│   ├── Categories/
+│   ├── ProductDetail/
+│   ├── AddProduct/
+│   ├── Saved/
+│   ├── Collections/
+│   ├── Filters/
+│   └── Account/
+│
+├── Components/
+│   ├── ProductCard.swift
+│   ├── SearchBar.swift
+│   ├── FilterChip.swift
+│   ├── CategoryCard.swift
+│   └── ProductGallery.swift
+│
+├── Services/
+│   ├── ProductRepository.swift
+│   ├── ImageService.swift
+│   └── LinkImportService.swift
+│
+└── Resources/
+    └── Assets.xcassets
+
+Los componentes deben ser reutilizables.
+
+No duplicar toda la implementación visual para cada categoría.
+
+La misma cuadrícula de productos debe funcionar para camisas, pantalones, carteras, joyería y demás artículos.
+
+Los filtros y atributos se adaptarán a cada categoría.
+
+⸻
+
+22. ORDEN DE IMPLEMENTACIÓN
+
+Desarrollar en el siguiente orden:
+
+Fase 1 — Diseño y navegación
+
+Construir las diez pantallas de referencia y la pestaña Cuenta.
+
+Utilizar datos demostrativos para verificar visualmente el resultado.
+
+Implementar navegación real entre pantallas.
+
+Fase 2 — Almacenamiento
+
+Crear modelos persistentes y sustituir las listas demostrativas por datos guardados.
+
+Implementar favoritos, colecciones, búsqueda y filtros.
+
+Fase 3 — Añadir artículos
+
+Implementar formularios completos, importación de imágenes y guardado de enlaces.
+
+La extracción automática de información desde enlaces será progresiva y tendrá siempre una opción manual.
+
+Fase 4 — Experiencia y calidad
+
+Completar estados vacíos, gestión de errores, edición, eliminación, ordenación, rendimiento y pulido visual.
+
+Fase 5 — Funciones posteriores
+
+Sincronización en la nube, integración con ChatGPT, importación masiva y actualizaciones de precios cuando existan fuentes compatibles.
+
+⸻
+
+23. REGLAS PARA EL DESARROLLO
+
+1. La imagen es la referencia visual principal. No rediseñar la aplicación sin autorización.
+2. No construir solamente una maqueta: quiero pantallas conectadas, botones funcionales y almacenamiento real.
+3. No presentar productos demostrativos como si fueran artículos guardados por el usuario.
+4. No inventar valoraciones, precios, descuentos, fotografías QC ni garantías de calidad.
+5. No hacer depender la aplicación de un solo agente o tienda.
+6. Permitir guardar productos aunque no tengan enlace, precio o todas sus fotografías.
+7. Diseñar todos los componentes para que puedan ampliarse sin reconstruir la aplicación.
+8. Mantener los datos del usuario separados de las imágenes o productos demostrativos.
+9. No implementar pagos ni funciones comerciales innecesarias.
+10. Probar los flujos completos en el simulador de iPhone y, cuando sea posible, en el dispositivo real.
+
+⸻
+
+24. RESULTADO FINAL ESPERADO
+
+Quiero abrir la aplicación en mi iPhone y encontrar una experiencia como la imagen de referencia.
+
+Desde Inicio podré entrar a Carteras, Camisas, Pantalones, Pantallas o cualquier otra categoría.
+
+Dentro de cada una veré mis productos organizados visualmente, con fotografías grandes, filtros útiles y precios claros.
+
+Podré seleccionar un producto para ver todas sus imágenes, inspeccionar sus detalles y abrir el enlace de compra.
+
+También podré pegar un enlace nuevo, subir fotos, asignarle una categoría y guardarlo en una colección.
+
+Con el tiempo tendré cientos o miles de artículos organizados, preparados para comprarlos cuando quiera.
+
+El objetivo no es crear un marketplace. Es crear mi catálogo personal de moda, con la calidad visual y comodidad de una aplicación comercial de primera categoría.
+
+Empieza implementando la base del proyecto, la navegación y las pantallas de la imagen. Después completa la persistencia y el funcionamiento de cada módulo. Conserva siempre el diseño aprobado y entrega código ejecutable, no solamente una explicación de cómo construirlo.

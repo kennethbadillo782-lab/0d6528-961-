@@ -1,0 +1,54 @@
+# Alternativa: si el .xcodeproj no abre en tu versión de Xcode,
+# instala XcodeGen (brew install xcodegen) y ejecuta `xcodegen` en esta carpeta.
+name: MiCatalogo
+options:
+  bundleIdPrefix: com.micatalogo
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: es
+targets:
+  MiCatalogo:
+    type: application
+    platform: iOS
+    sources:
+      - FashionCatalog
+    info:
+      path: Config/Info.plist
+      properties:
+        CFBundleDisplayName: Mi Catálogo
+        UIDesignRequiresCompatibility: true
+        UIUserInterfaceStyle: Dark
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.micatalogo.moda
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+  MiCatalogoTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - FashionCatalogTests
+    dependencies:
+      - target: MiCatalogo
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.micatalogo.moda.tests
+schemes:
+  MiCatalogo:
+    build:
+      targets:
+        MiCatalogo: all
+        MiCatalogoTests: [test]
+    test:
+      targets:
+        - MiCatalogoTests

@@ -1,0 +1,41 @@
+workflows:
+  ios-simulator:
+    name: MiCatalogo nativo - simulador y XCTest
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: latest
+    scripts:
+      - name: Instalar generador de proyecto
+        script: command -v xcodegen >/dev/null || brew install xcodegen
+      - name: Compilar app nativa para Appetize
+        script: bash scripts/build-simulator.sh
+      - name: Ejecutar XCTest en iPhone disponible
+        script: bash scripts/test-ios.sh
+    artifacts:
+      - build/MiCatalogo-simulator.zip
+      - reports/ios-*.log
+      - reports/ios-*.txt
+      - reports/*.xcresult
+  ios-device:
+    name: MiCatalogo nativo - dispositivo (requiere configurar firma)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: latest
+      vars:
+        IOS_BUNDLE_ID: com.micatalogo.moda
+      # Antes de usar: cambiar el id por uno propio y cargar certificados/perfil.
+      ios_signing:
+        distribution_type: ad_hoc
+        bundle_identifier: com.micatalogo.moda
+    scripts:
+      - name: Instalar generador
+        script: command -v xcodegen >/dev/null || brew install xcodegen
+      - name: Compilar y exportar IPA firmada
+        script: bash scripts/build-device.sh
+    artifacts:
+      - build/device/*.ipa
+      - build/MiCatalogo.xcarchive/dSYMs/*.dSYM
+      - reports/ios-*.log
+# Los workflows se ejecutan manualmente. Sin publicación automática ni consumo autorizado de pago.

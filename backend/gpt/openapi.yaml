@@ -1,0 +1,507 @@
+openapi: 3.1.0
+info:
+  title: Mi Catálogo de Moda
+  version: 1.0.0
+  description: Catálogo personal de ropa y accesorios del usuario. Permite consultar, crear y editar productos,
+    añadir fotos y organizarlos en colecciones. No permite borrar productos. Consultar el catálogo y modificar productos
+    existentes siempre pide confirmación al usuario.
+servers:
+- url: https://TU-PROYECTO.supabase.co/functions/v1/catalog-api
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    AgentLink:
+      type: object
+      properties:
+        name:
+          type: string
+          description: 'Agente: Hipobuy, Sugargoo, KakoBuy, CSSBuy, Mulebuy u Otro'
+        url:
+          type: string
+          description: Enlace real del producto en ese agente
+      required:
+      - name
+      - url
+    ImageInput:
+      type: object
+      properties:
+        url:
+          type: string
+          maxLength: 600
+          description: Enlace directo a la imagen (jpg, png o webp), no a la página
+        kind:
+          type: string
+          enum:
+          - official
+          - qc
+          - buyer
+          - worn
+          - manual
+          description: official = foto del anuncio, qc = foto de inspección, buyer = foto de comprador, worn = producto
+            puesto
+      required:
+      - url
+    ProductFields:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Nombre corto y claro del producto
+        brand:
+          type: string
+        category_key:
+          type: string
+          description: Clave de GET /categories (por ejemplo carteras, camisas, pantalones, pantallas)
+        subcategory:
+          type: string
+          description: Una de las subcategorías de esa categoría
+        description:
+          type: string
+        price_current:
+          type: number
+          description: Precio tal como aparece en la tienda, en su moneda original
+        price_previous:
+          type: number
+          description: Solo si la tienda muestra un precio anterior real
+        currency:
+          type: string
+          enum:
+          - USD
+          - CNY
+          - EUR
+          - GBP
+          - JPY
+          - KRW
+          - HKD
+          - MXN
+          - CAD
+        shipping_estimate_usd:
+          type: number
+        original_url:
+          type: string
+          description: Enlace de la página del producto (tienda o agente)
+        platform:
+          type: string
+          description: Taobao, Weidian, 1688, Yupoo, etc.
+        agent_links:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentLink'
+        seller_name:
+          type: string
+        seller_rating:
+          type: number
+          description: Solo si la página muestra una valoración real (0 a 5)
+        seller_rating_count:
+          type: string
+          description: Número de reseñas tal como aparece, por ejemplo 1.2k
+        seller_rating_source:
+          type: string
+        color:
+          type: string
+        size:
+          type: string
+        material:
+          type: string
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+          description: 'Atributos por categoría. Pantalones: largo, corte, cintura. Carteras: tamano, compartimentos,
+            ancho, alto, profundidad (cm). Pantallas: tamanoMM, piedra, metal, cierre, forma.'
+        declared_quality:
+          type: string
+          description: Calidad que afirma el vendedor, por ejemplo 1:1
+        included_accessories:
+          type: string
+        notes:
+          type: string
+          description: Notas útiles para el usuario, como por qué se eligió
+        is_favorite:
+          type: boolean
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 3
+        status:
+          type: string
+          enum:
+          - researching
+          - favorite
+          - pending
+          - ready
+          - purchased
+          - discarded
+    ProductSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        brand:
+          type: string
+        category_key:
+          type: string
+        subcategory:
+          type: string
+        price_current:
+          type:
+          - number
+          - 'null'
+        price_previous:
+          type:
+          - number
+          - 'null'
+        currency:
+          type: string
+        platform:
+          type: string
+        is_favorite:
+          type: boolean
+        status:
+          type: string
+        original_url:
+          type: string
+        created_at:
+          type: string
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        issues:
+          type: array
+          items:
+            type: string
+        existing:
+          type: object
+security:
+- ApiKeyAuth: []
+paths:
+  /categories:
+    get:
+      operationId: listCategories
+      x-openai-isConsequential: false
+      summary: Lista las categorías y subcategorías del catálogo
+      responses:
+        '200':
+          description: Categorías
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                        group_key:
+                          type: string
+                        subcategories:
+                          type: array
+                          items:
+                            type: string
+  /collections:
+    get:
+      operationId: listCollections
+      x-openai-isConsequential: false
+      summary: Lista las colecciones del usuario con su número de productos
+      responses:
+        '200':
+          description: Colecciones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  collections:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        product_count:
+                          type: integer
+    post:
+      operationId: createCollection
+      x-openai-isConsequential: false
+      summary: Crea una colección (si ya existe con ese nombre, devuelve la existente)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+              required:
+              - name
+      responses:
+        '201':
+          description: Colección creada o existente
+  /products:
+    get:
+      operationId: listProducts
+      x-openai-isConsequential: true
+      summary: Busca productos guardados por texto, categoría, marca, estado o favoritos
+      parameters:
+      - name: q
+        in: query
+        schema:
+          type: string
+        description: Texto a buscar en nombre, marca, vendedor y notas
+      - name: category
+        in: query
+        schema:
+          type: string
+      - name: brand
+        in: query
+        schema:
+          type: string
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - researching
+          - favorite
+          - pending
+          - ready
+          - purchased
+          - discarded
+      - name: favorite
+        in: query
+        schema:
+          type: boolean
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      responses:
+        '200':
+          description: Lista de productos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductSummary'
+    post:
+      operationId: createProduct
+      x-openai-isConsequential: false
+      summary: Guarda un producto nuevo con sus fotos y colecciones. Responde 409 si el enlace ya estaba guardado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/ProductFields'
+              - type: object
+                properties:
+                  images:
+                    type: array
+                    maxItems: 10
+                    items:
+                      $ref: '#/components/schemas/ImageInput'
+                  collections:
+                    type: array
+                    items:
+                      type: string
+                    description: Nombres o ids de colecciones; las que no existan se crean
+                  allow_duplicate:
+                    type: boolean
+                    description: true solo si el usuario pidió guardarlo aunque ya exista
+      responses:
+        '201':
+          description: Producto guardado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  product:
+                    $ref: '#/components/schemas/ProductSummary'
+                  images_saved:
+                    type: integer
+                  image_errors:
+                    type: array
+                    items:
+                      type: object
+                  collections:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Datos no válidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Ya existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /products/check-duplicate:
+    post:
+      operationId: checkDuplicate
+      x-openai-isConsequential: false
+      summary: Comprueba si un enlace de producto ya está guardado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+              required:
+              - url
+      responses:
+        '200':
+          description: Resultado
+  /products/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      operationId: getProduct
+      x-openai-isConsequential: true
+      summary: Devuelve todos los datos de un producto, sus fotos y colecciones
+      responses:
+        '200':
+          description: Producto
+        '404':
+          description: No existe
+    patch:
+      operationId: updateProduct
+      x-openai-isConsequential: true
+      summary: Modifica solo los campos enviados de un producto existente. Los enlaces (original_url, agent_links,
+        platform) no se pueden cambiar por aquí.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductFields'
+      responses:
+        '200':
+          description: Producto actualizado
+        '403':
+          description: Se intentó cambiar un enlace; solo se permite desde la app
+  /products/{id}/images:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      operationId: addProductImages
+      x-openai-isConsequential: true
+      summary: Añade fotos a un producto (máximo 10 por petición)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                images:
+                  type: array
+                  maxItems: 10
+                  items:
+                    $ref: '#/components/schemas/ImageInput'
+              required:
+              - images
+      responses:
+        '200':
+          description: Resultado de la descarga de cada foto
+  /products/{id}/favorite:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    put:
+      operationId: setFavorite
+      x-openai-isConsequential: true
+      summary: Marca o desmarca un producto como favorito
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_favorite:
+                  type: boolean
+              required:
+              - is_favorite
+      responses:
+        '200':
+          description: Producto actualizado
+  /products/{id}/collections:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      operationId: updateProductCollections
+      x-openai-isConsequential: true
+      summary: Añade o quita un producto de colecciones (por nombre o id)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                add:
+                  type: array
+                  items:
+                    type: string
+                remove:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Colecciones actualizadas

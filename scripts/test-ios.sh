@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+mkdir -p reports
+# Preferir iPhone 17 Pro Max; dejar registrada cualquier alternativa disponible.
+udid=$(xcrun simctl list devices available -j | python3 -c '
+import sys,json
+ds=[d for v in json.load(sys.stdin)["devices"].values() for d in v if "iPhone" in d["name"]]
+if not ds: raise SystemExit("No hay simulador iPhone instalado")
+d=next((d for d in ds if d["name"]=="iPhone 17 Pro Max"),ds[0])
+print(d["udid"])
+')
+echo "Destino real: $udid" | tee reports/ios-destination.txt
+xcodebuild -project ios/MiCatalogo.xcodeproj -scheme MiCatalogo -configuration Debug \
+  -destination "platform=iOS Simulator,id=$udid" -derivedDataPath build/TestDerivedData \
+  -resultBundlePath "reports/ios-$(date +%s).xcresult" CODE_SIGNING_ALLOWED=NO test \
+  2>&1 | tee reports/ios-tests.log
