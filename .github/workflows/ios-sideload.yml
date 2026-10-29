@@ -1,0 +1,29 @@
+name: iOS SideStore IPA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-sideload
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install XcodeGen
+        run: command -v xcodegen || brew install xcodegen
+      - name: Build unsigned device IPA
+        run: bash scripts/build-sideload.sh "${{ github.run_number }}"
+      - name: Save IPA
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: MiCatalogo-ipa-${{ github.run_number }}
+          retention-days: 7
+          path: |
+            build/MiCatalogo.ipa
+            build/source.json
+            reports/ios-sideload-build.log
