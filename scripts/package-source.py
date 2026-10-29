@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib, json, zipfile
 ROOT = Path(__file__).resolve().parent.parent
 target = ROOT.parent / 'MiCatalogo-preparado.zip'
-excluded = {'.git', '.tools', '.local', '.venv', '__pycache__', 'DerivedData', 'build', 'node_modules', 'xcuserdata'}
+excluded = {'.git', '.tools', '.local', '.venv', '.temp', '.branches', '__pycache__', 'DerivedData', 'build', 'node_modules', 'xcuserdata'}
 def allowed(path):
     rel = path.relative_to(ROOT)
     return (path.is_file() and not any(part in excluded for part in rel.parts)

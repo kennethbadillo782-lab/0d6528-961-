@@ -94,9 +94,11 @@ try:
     accepted = sum(v.splitlines()[-1] == 't' for v in responses)
     assert accepted == 20, accepted
     upgrade = create_db('upgrade')
-    for migration in migrations[:-1]: file(upgrade, migration)
+    for migration in migrations:
+        if migration.name.startswith('20261028'): file(upgrade, migration)
     sql(upgrade, "insert into auth.users values ('eeeeeeee-0000-4000-8000-000000000005','upgrade@example.invalid'); select public.create_api_key('old','{read,write}',null,'eeeeeeee-0000-4000-8000-000000000005') is not null")
-    file(upgrade, migrations[-1])
+    for migration in migrations:
+        if not migration.name.startswith('20261028'): file(upgrade, migration)
     assert sql(upgrade,'select count(*) from public.api_keys where expires_at is null') == '0'
     summary.update(status='passed', version=sql(db,'select version()'), attacksPassed=int(counts[0]), attacksFailed=int(counts[1]), concurrency={'requests':60,'accepted':accepted}, upgrade='passed', cleanupRetention='passed')
     print(f'PASS PostgreSQL: {counts[0]} ataques; carrera 20/60; actualización correcta.', flush=True)

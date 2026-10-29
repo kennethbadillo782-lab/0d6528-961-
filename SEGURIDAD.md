@@ -1,6 +1,6 @@
 # Informe de seguridad — Mi Catálogo de Moda
 
-> Actualización de preparación Windows (29/10/2026): los resultados históricos de este documento no sustituyen la verificación del entorno real. Ver `reports/INFORME.md` para la nueva ejecución: 15 utilidades, 27 flujos y 154 ataques de handler con dobles; 137 ataques en PostgreSQL 16.15 real con esquemas Auth/Storage de prueba; XSS Chromium sin ejecuciones. Compilación iOS, stack Supabase completo, Appetize y producción siguen pendientes. No se desplegó ningún servicio remoto.
+> Actualización Windows (29/10/2026): el backend Supabase local completo está funcionando, con 48 comprobaciones HTTP y 137 ataques SQL pasados sobre PostgreSQL 17.11 del stack. Se añadió una quinta migración tras encontrar `pg_trgm` y sus funciones expuestas en `public`; ahora están en `extensions`. Los puertos se verifican en `127.0.0.1`, y se ejecutó la limpieza programada real. También pasan 15 utilidades, 27 flujos y 154 ataques con dobles, y 137 ataques en PostgreSQL 16.15 independiente. Compilación iOS, Appetize y producción siguen pendientes. Ver `reports/INFORME.md`; no se desplegó ningún servicio remoto.
 
 Primera auditoría: 28 de octubre de 2026. Segunda auditoría (por cobertura e independiente): 29 de octubre de 2026.
 

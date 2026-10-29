@@ -5,7 +5,7 @@ do $$ begin create role authenticated nologin; exception when duplicate_object t
 do $$ begin create role service_role nologin bypassrls; exception when duplicate_object then null; end $$;
 create schema auth; create schema storage; create schema extensions;
 create extension pgcrypto schema extensions;
-create extension pg_trgm schema extensions;
+-- No preinstalar pg_trgm: una instancia real nueva deja que lo cree la migración.
 create table auth.users (id uuid primary key, email text);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);

@@ -2,14 +2,16 @@
 
 Estado al 29 de octubre de 2026: **todavía no existe una compilación iOS ni una sesión Appetize**. El código nativo sigue guardando localmente. La integración de autenticación y sincronización con Supabase no está implementada.
 
-Se prepararon las herramientas, pruebas, configuración local y workflows de compilación. No se modificó ningún Supabase remoto ni se creó ningún recurso de pago. El informe detallado está en `reports/INFORME.md`.
+El backend completo de pruebas ya funciona localmente en Docker. Se prepararon herramientas, pruebas y workflows de compilación. No se modificó ningún Supabase remoto ni se creó ningún recurso de pago. El informe detallado está en `reports/INFORME.md`.
 
 ## Lo que ya se ejecutó en este PC
 
 - Node 24.22.1: 15 pruebas de utilidades, 27 de flujo y 154 ataques de API; todas pasan. La API ejecuta su código real, con Supabase, DNS y descargas sustituidos por dobles de prueba.
 - Dos pruebas adicionales verifican que el handler usa la sal de IP configurada o la derivada del secreto del servicio. Ambas pasan.
-- PostgreSQL 16.15 real: cuatro migraciones, 137 ataques, carrera de 60 conexiones con exactamente 20 aceptadas y actualización desde la versión anterior; todas pasan. Auth y Storage son esquemas de prueba, no sus servicios HTTP.
-- Una prueba adicional ejecutó `api_cleanup()` en PostgreSQL y verificó que elimina los registros antiguos y conserva los recientes de las tres tablas afectadas. La programación real de cron sigue pendiente.
+- PostgreSQL 16.15 independiente: cinco migraciones, 137 ataques, carrera de 60 conexiones con exactamente 20 aceptadas y actualización desde la versión anterior; todas pasan. Auth y Storage son esquemas de prueba en esta suite.
+- Supabase completo con PostgreSQL 17.11: 48 comprobaciones HTTP sobre Auth, API, PostgREST y Storage, y los 137 ataques SQL originales adaptados a las columnas reales de Auth y ejecutados dentro de una transacción revertida; todos pasan.
+- Se verificaron la retención de registros, el trabajo diario de `api_cleanup()` y una ejecución real programada de limpieza.
+- Cinco comprobaciones del lanzador Docker verifican rechazo de puertos abiertos, publicación en loopback y transmisión exacta de entrada binaria y argumentos.
 - Chromium: recorrido de 120 interacciones más 60 tras importar una copia maliciosa; cero XSS, enlaces peligrosos o errores JavaScript. Esta comprobación corresponde solo a la vista previa web.
 - Validación de YAML, TOML, plist, XML y sintaxis de scripts. No equivale a ejecutar los servicios ni a compilar Swift.
 
@@ -39,9 +41,9 @@ node scripts/test-all.mjs
 
 ## 2. Iniciar Supabase completo
 
-Se instalaron Docker Desktop 4.97.0 y WSL en este PC, con la autorización de administrador que completó el usuario. Windows confirmó que necesita **reiniciarse para aplicar los cambios**. No se reinició automáticamente. El stack Supabase aún no arrancó; el intento de iniciar Docker agotó su plazo mientras faltaba completar esos cambios.
+Docker Desktop 4.97.0 y WSL ya están instalados; el usuario reinició Windows y el backend está funcionando. API: `http://127.0.0.1:54321`; panel administrativo de Supabase: `http://127.0.0.1:54323`. Ese panel no es la aplicación iPhone.
 
-Después del reinicio, abre Docker Desktop, completa su primer arranque y comprueba que use contenedores Linux. En otro PC: instala Docker Desktop y WSL2 antes de continuar. `scripts/Enable-WSL.ps1` documenta el paso administrativo; en Windows PowerShell con scripts restringidos se puede lanzar localmente mediante `powershell -ExecutionPolicy RemoteSigned -File ./scripts/Enable-WSL.ps1`, desde una consola de administrador. Ese parámetro solo afecta al proceso y no cambia la política del sistema.
+Para volver a arrancarlo tras apagar el PC, abre Docker Desktop en modo Linux. En otro PC: instala primero Docker Desktop y WSL2. `scripts/Enable-WSL.ps1` documenta ese paso administrativo; en Windows PowerShell con scripts restringidos se puede lanzar localmente mediante `powershell -ExecutionPolicy RemoteSigned -File ./scripts/Enable-WSL.ps1`, desde una consola de administrador. Ese parámetro solo afecta al proceso y no cambia la política del sistema.
 
 Después:
 
@@ -52,22 +54,23 @@ Después:
 ./scripts/Stop-Backend.ps1
 ```
 
-La red Docker se crea limitada a loopback. API local: `http://127.0.0.1:54321`; Studio: `http://127.0.0.1:54323`. Las credenciales que devuelve la CLI se capturan en memoria y no se imprimen en los diagnósticos. El test HTTP prepara una sola cuenta ficticia con contraseña efímera, autentica, renueva sesión, prueba API/RLS/Storage y revoca su clave al finalizar. **Ese test HTTP todavía no se ha ejecutado**. No se abre el registro público.
+La red Docker tiene una dirección de publicación por defecto local, pero este Docker Desktop la ignoró. Por eso el arranque compila un lanzador pequeño desde `scripts/docker-loopback.cs`: únicamente añade `127.0.0.1` a los puertos de contenedores de `micatalogo-test`, sin cambiar Docker globalmente. `Start-Backend.ps1` inspecciona los puertos y detiene los servicios si alguno queda abierto en otra dirección. Los resultados están en `reports/port-bindings.json`.
 
-La CLI 2.122.0 rechazó `db.major_version=16`; el stack se configuró para PostgreSQL 17, que sí acepta. La regresión SQL de esta entrega se ejecutó con PostgreSQL 16.15. Falta confirmar las migraciones en el stack 17 completo.
+Las credenciales de la CLI se capturan en memoria y no se imprimen en los diagnósticos. Las 48 pruebas HTTP ya se ejecutaron: cuenta ficticia única, login, renovación, registro cerrado, RLS, permisos separados, caducidad/revocación, pausa, duplicados simultáneos, DNS/imagen real y Storage privado. No se abre el registro público: `auth.enable_signup=false` lo cierra globalmente; `auth.email.enable_signup=true` mantiene activo el proveedor de login y la base de datos limita el catálogo a un usuario.
 
-Los contenedores siguen activos al cerrar la consola mientras Docker y el PC estén funcionando. No se ha instalado arranque automático de Windows ni un servidor público permanente. Para funcionar con el PC apagado hace falta un proyecto de pruebas alojado.
+La CLI 2.122.0 rechazó `db.major_version=16`; el stack usa PostgreSQL 17.11, ya verificado con 137 ataques SQL. También se conserva la suite independiente en PostgreSQL 16.15. La quinta migración corrige una diferencia que el stub original ocultaba: `pg_trgm` se instalaba en `public` en un Supabase nuevo; ahora se mueve a `extensions` sin romper los índices.
+
+Los contenedores siguen activos al cerrar la consola mientras Docker y el PC estén funcionando. No se ha instalado un servidor público permanente ni se depende de una ventana de terminal. Para funcionar con el PC apagado hace falta un proyecto de pruebas alojado. El entorno local usa HTTP en loopback; el futuro backend accesible desde Appetize debe usar HTTPS y requiere autorización separada.
 
 ## 3. Compilar la app nativa desde Windows
 
-Hace falta crear una cuenta GitHub y un repositorio **privado**, y una cuenta Codemagic. El usuario confirmó que aún no tiene esas cuentas. No se creó ni publicó un repositorio en su nombre.
+GitHub ya está conectado como `kennethbadillo782-lab`. Repositorio privado: https://github.com/kennethbadillo782-lab/MiCatalogo. No hace falta crear otra cuenta ni usar Codemagic para la compilación de simulador.
 
-1. Sube el contenido de esta carpeta al repositorio privado, respetando `.gitignore`.
-2. Conecta ese repositorio a Codemagic y selecciona `codemagic.yaml`.
-3. Revisa la cuota/precio de la cuenta antes de iniciar una máquina macOS. No se autorizó ningún gasto.
-4. Ejecuta manualmente el workflow **ios-simulator**.
-5. Este genera el proyecto desde `ios/project.yml`, incluyendo el target XCTest, compila una app ARM64 de simulador y ejecuta las pruebas en un iPhone disponible. Intenta elegir iPhone 17 Pro Max; cualquier alternativa queda registrada.
-6. Descarga `build/MiCatalogo-simulator.zip` y los resultados XCTest. Si la compilación falla, sus errores deben corregirse y el workflow debe repetirse antes de afirmar que la app funciona.
+El workflow manual `.github/workflows/ios-simulator.yml` usa un runner estándar `macos-26`, limita la ejecución a 20 minutos y conserva artefactos un día. La cuenta tiene cuota incluida disponible y presupuesto de sobreconsumo de Actions en cero, bloqueado; no se ha aumentado ningún presupuesto. Debe ejecutarse y corregirse según sus diagnósticos antes de afirmar que existe una app compilada.
+
+1. Abre Actions y ejecuta manualmente **iOS Simulator**.
+2. Espera a que terminen compilación y XCTest.
+3. Descarga el artefacto `MiCatalogo-simulator`, que contiene el ZIP de la app y los diagnósticos.
 
 La configuración usa el Xcode disponible más reciente del proveedor. El proyecto declara iOS 17+ y Swift 5; el `.xcodeproj` original usa grupos sincronizados de Xcode 16+. El workflow regenera el proyecto con XcodeGen para incorporar las pruebas que faltaban en el proyecto original. No hay CocoaPods ni dependencias Swift externas en la versión local.
 

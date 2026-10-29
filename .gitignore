@@ -5,6 +5,7 @@
 .env.*
 !.env.example
 backend/supabase/.temp/
+backend/supabase/.branches/
 xcuserdata/
 DerivedData/
 .tools/

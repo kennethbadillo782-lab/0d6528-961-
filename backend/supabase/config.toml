@@ -32,7 +32,9 @@ enable_refresh_token_rotation = true
 jwt_expiry = 3600
 minimum_password_length = 12
 [auth.email]
-enable_signup = false
+# En esta CLI desactivar este valor también desactiva el proveedor de email.
+# El registro sigue cerrado por auth.enable_signup=false y max_users=1 en SQL.
+enable_signup = true
 enable_confirmations = true
 [storage]
 enabled = true

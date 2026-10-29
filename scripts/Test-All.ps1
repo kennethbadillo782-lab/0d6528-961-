@@ -13,7 +13,15 @@ if (Test-Path (Join-Path $PgBin 'postgres.exe')) {
     & $python "$PSScriptRoot/test-database.py" --pg-bin $PgBin
     if ($LASTEXITCODE -ne 0) { $failed += 'PostgreSQL real' }
 } else { $failed += 'PostgreSQL no instalado: scripts/Install-Postgres.ps1' }
-if ($Live) { & "$PSScriptRoot/Test-Live.ps1" }
+if ($Live) {
+    & $python "$PSScriptRoot/test-docker-loopback.py"
+    if ($LASTEXITCODE -ne 0) { throw 'Falló la prueba real del lanzador Docker.' }
+    & $python "$PSScriptRoot/test-stack-sql.py"
+    if ($LASTEXITCODE -ne 0) { throw 'Falló la auditoría SQL del stack real.' }
+    & "$PSScriptRoot/Test-Live.ps1"
+    & $python "$PSScriptRoot/test-runtime-state.py"
+    if ($LASTEXITCODE -ne 0) { throw 'Falló la comprobación real de cron.' }
+}
 else { Write-Host 'OMITIDO: Supabase completo. Usar -Live tras Start-Backend.ps1.' }
 Write-Host 'iOS y XSS tienen comandos separados; no se declaran verificados con este comando.'
 if ($failed.Count) { throw ($failed -join '; ') }

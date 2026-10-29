@@ -7,6 +7,7 @@ from jsonschema import Draft202012Validator
 ROOT = Path(__file__).resolve().parent.parent
 cfg = tomllib.loads((ROOT / 'backend/supabase/config.toml').read_text(encoding='utf-8'))
 assert cfg['auth']['enable_signup'] is False
+assert cfg['auth']['email']['enable_signup'] is True, 'El proveedor de email debe permitir login; el registro se cierra globalmente.'
 assert cfg['functions']['catalog-api']['verify_jwt'] is False
 for p in (ROOT / 'backend/gpt').glob('*.yaml'):
     doc = yaml.safe_load(p.read_text(encoding='utf-8'))

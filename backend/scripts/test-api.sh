@@ -25,7 +25,7 @@ if [ -n "$ID" ]; then
   echo "9) SSRF con IPv6 mapeada, nombre interno y punto final (las 3 deben fallar)"
   curl -s "${h[@]}" -X POST "$API_URL/products/$ID/images" -d '{"images":["http://[::ffff:169.254.169.254]/x.png","http://db/x.png","http://localhost./x.png"]}' | head -c 400; echo
   echo "10) Foto real (debe guardarse 1; si dice 'No se pudo verificar el servidor', Deno.resolveDns no está disponible)"
-  curl -s "${h[@]}" -X POST "$API_URL/products/$ID/images" -d '{"images":["https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/280px-PNG_transparency_demonstration_1.png"]}' | head -c 300; echo
+  curl -s "${h[@]}" -X POST "$API_URL/products/$ID/images" -d '{"images":["https://cdn.shopify.com/static/shopify-favicon.png"]}' | head -c 300; echo
 fi
 echo "11) Clave en la URL no sirve (401)"; curl -s -o /dev/null -w "%{http_code}\n" "$API_URL/categories?api_key=$API_KEY"
 echo "12) Borrar no existe (405)"; curl -s -o /dev/null -w "%{http_code}\n" "${h[@]}" -X DELETE "$API_URL/products"

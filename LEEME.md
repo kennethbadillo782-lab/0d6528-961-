@@ -1,6 +1,6 @@
 # Mi Catálogo de Moda — paquete completo
 
-> Preparación actualizada para Windows y pruebas nativas: empieza por `EMPEZAR-AQUI.md`. Docker y WSL se instalaron; Windows requiere reinicio. Los scripts y workflows están preparados, pero no hay una compilación iOS, sesión Appetize ni sincronización nativa verificadas. Resultados de pruebas en `reports/INFORME.md`.
+> Preparación actualizada para Windows y pruebas nativas: empieza por `EMPEZAR-AQUI.md`. El backend Supabase local ya funciona en Docker con puertos limitados a `127.0.0.1`: pasaron 48 comprobaciones HTTP y 137 ataques SQL sobre el stack real. Todavía no hay compilación iOS, sesión Appetize ni sincronización nativa. Resultados y correcciones en `reports/INFORME.md`.
 
 | Carpeta | Qué es | Estado |
 |---|---|---|
