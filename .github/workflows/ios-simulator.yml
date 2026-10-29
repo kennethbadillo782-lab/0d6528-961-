@@ -31,3 +31,4 @@ jobs:
             reports/ios-*.log
             reports/ios-*.txt
             reports/ios-*.xcresult
+            reports/ios-*.png
