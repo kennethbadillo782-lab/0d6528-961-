@@ -74,6 +74,7 @@ final class CatalogSync: ObservableObject {
     private var busy = false
 
     func run(context: ModelContext) async {
+        if let bound = UserDefaults.standard.string(forKey:"catalog.cloud.owner") { try? capturePending(context:context,owner:bound) }
         let account = CloudAccount.shared
         guard let client = account.client, account.email != nil else { return }
         do {
@@ -93,11 +94,12 @@ final class CatalogSync: ObservableObject {
         let binding = UserDefaults.standard.string(forKey:"catalog.cloud.owner")
         guard binding == nil || binding == owner else { throw CloudError.accountMismatch }
         UserDefaults.standard.set(owner,forKey:"catalog.cloud.owner")
+        try capturePending(context:context,owner:owner)
         var remote: [String:[CloudRow]] = [:]
         for table in CloudMapping.tables { remote[table] = try await transport.fetch(table) }
         // Fusionar por nombre la colección sembrada al primer login; nunca crear dos "Lista principal".
         for c in try context.fetch(FetchDescriptor<ProductCollection>()) {
-            if !allEntries.contains(where: { $0.table == "collections" && $0.rowKey == c.id.uuidString.lowercased() }),
+            if !allEntries.contains(where: { $0.table == "collections" && $0.rowKey == c.id.uuidString.lowercased() && !$0.remoteStamp.isEmpty }),
                let r = remote["collections"]?.first(where: { ($0["name"] as? String)?.lowercased() == c.name.lowercased() && !($0["deleted_at"] is String) }), let id = UUID(uuidString:r["id"] as? String ?? "") { c.id = id }
         }
         // Solo sube contenido binario nuevo; rutas aleatorias evitan sobreescribir una foto remota.
@@ -114,7 +116,9 @@ final class CatalogSync: ObservableObject {
             }
         }
         let local = try CloudMapping.snapshots(context)
-        var entries = allEntries
+        var entries = try context.fetch(FetchDescriptor<CloudSyncEntry>())
+        for e in entries where e.remoteStamp.isEmpty && e.table == "collections" && !local.contains(where: { $0.table == e.table && $0.key == e.rowKey }) { context.delete(e) }
+        entries = entries.filter { e in !(e.remoteStamp.isEmpty && e.table == "collections" && !local.contains(where: { $0.table == e.table && $0.key == e.rowKey })) }
         for snapshot in local {
             if let e = entries.first(where: { $0.table == snapshot.table && $0.rowKey == snapshot.key }) {
                 if e.fingerprint != snapshot.fingerprint && e.pendingSince == nil { e.pendingSince = snapshot.modified ?? Date() }
@@ -173,6 +177,21 @@ final class CatalogSync: ObservableObject {
             if let s = after.first(where: { $0.table == e.table && $0.key == e.rowKey }) { e.fingerprint = s.fingerprint }
         }
         try context.save(); lastSync = Date(); status = "Sincronizado"
+    }
+    func capturePending(context: ModelContext, owner: String) throws {
+        let snapshots = try CloudMapping.snapshots(context)
+        var entries = try context.fetch(FetchDescriptor<CloudSyncEntry>()).filter { $0.owner == owner }
+        for s in snapshots {
+            if let e = entries.first(where: { $0.table == s.table && $0.rowKey == s.key }) {
+                if e.fingerprint != s.fingerprint && e.pendingSince == nil { e.pendingSince = s.modified ?? Date() }
+            } else {
+                let e = CloudSyncEntry(owner:owner,table:s.table,key:s.key); e.pendingSince = s.modified ?? Date(); context.insert(e); entries.append(e)
+            }
+        }
+        for e in entries where !e.isDeleted && !snapshots.contains(where: { $0.table == e.table && $0.key == e.rowKey }) {
+            if e.pendingSince == nil { e.pendingSince = Date() }
+        }
+        try context.save()
     }
     private func identity(table: String, key: String) -> CloudRow {
         if table == "categories" { return ["key":key] }

@@ -50,6 +50,7 @@ final class CloudAccount: ObservableObject {
     }
     func restore() async {
         guard let client else { message = "Esta compilación no tiene servidor configurado."; return }
+        email = client.auth.currentSession?.user.email
         if let session = try? await client.auth.session { email = session.user.email; message = "Sesión recuperada." }
     }
     func sendLink(_ address: String) async {
