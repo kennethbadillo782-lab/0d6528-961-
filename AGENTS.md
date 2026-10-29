@@ -22,7 +22,7 @@ Lee primero:
   - Proyecto `MiCatalogo.xcodeproj` con la carpeta sincronizada `FashionCatalog/` (Xcode 16+). Alternativa: `project.yml` (XcodeGen).
   - **Nunca se ha compilado.** Compílala primero y corrige los errores antes de añadir nada.
 - **Backend** (`backend/supabase/`):
-  - 5 migraciones SQL probadas en Postgres 16 y en el stack Supabase local con Postgres 17, con 137 ataques bloqueados en ambos. Ver `reports/INFORME.md` para la ejecución más reciente.
+  - 6 migraciones SQL probadas en Postgres 16 y en el stack Supabase local con Postgres 17, con 137 ataques bloqueados en ambos. Ver `reports/INFORME.md` para la ejecución más reciente.
   - La Edge Function `catalog-api` (Deno/TypeScript).
   - Las pruebas.
 - **ChatGPT** (`backend/gpt/`): `openapi.yaml` (11 operaciones) e `instrucciones-gpt.md`.
@@ -56,7 +56,7 @@ Si cambias algo del backend, vuelve a ejecutar todo. Ninguna prueba de `attack.m
 1. Prepara el proyecto:
    - Ejecuta `cd backend && supabase init` si no existe.
    - Fusiona `supabase/config.toml`, con la sección `[functions.catalog-api]` y `verify_jwt = false`.
-2. Solo después de autorización explícita para ese proyecto remoto y copia de seguridad: ejecuta `supabase link --project-ref $PROJECT_REF` y después `supabase db push`, que aplica las 5 migraciones. El entorno local ya se preparó con `scripts/Start-Backend.ps1`; no confundirlo con un despliegue remoto.
+2. Solo después de autorización explícita para ese proyecto remoto y copia de seguridad: ejecuta `supabase link --project-ref $PROJECT_REF` y después `supabase db push`, que aplica las 6 migraciones. El entorno local ya se preparó con `scripts/Start-Backend.ps1`; no confundirlo con un despliegue remoto.
 3. Crea el usuario y su catálogo:
    - **Registro cerrado:** la migración `security_lockdown` solo admite 1 usuario en total (`private.app_config.max_users`).
    - Si el usuario ya creó su cuenta, perfecto. Si no, que la cree ahora (Authentication › Add user); será la única permitida.

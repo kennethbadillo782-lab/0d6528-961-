@@ -20,3 +20,5 @@ reports/*.json
 *.xcresult/
 __pycache__/
 *.pyc
+
+**/.temp/

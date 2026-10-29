@@ -8,7 +8,7 @@ El backend completo de pruebas ya funciona localmente en Docker. Se prepararon h
 
 - Node 24.22.1: 15 pruebas de utilidades, 27 de flujo y 154 ataques de API; todas pasan. La API ejecuta su código real, con Supabase, DNS y descargas sustituidos por dobles de prueba.
 - Dos pruebas adicionales verifican que el handler usa la sal de IP configurada o la derivada del secreto del servicio. Ambas pasan.
-- PostgreSQL 16.15 independiente: cinco migraciones, 137 ataques, carrera de 60 conexiones con exactamente 20 aceptadas y actualización desde la versión anterior; todas pasan. Auth y Storage son esquemas de prueba en esta suite.
+- PostgreSQL 16.15 independiente: seis migraciones, 137 ataques, carrera de 60 conexiones con exactamente 20 aceptadas y actualización desde la versión anterior; todas pasan. Auth y Storage son esquemas de prueba en esta suite.
 - Supabase completo con PostgreSQL 17.11: 48 comprobaciones HTTP sobre Auth, API, PostgREST y Storage, y los 137 ataques SQL originales adaptados a las columnas reales de Auth y ejecutados dentro de una transacción revertida; todos pasan.
 - Se verificaron la retención de registros, el trabajo diario de `api_cleanup()` y una ejecución real programada de limpieza.
 - Cinco comprobaciones del lanzador Docker verifican rechazo de puertos abiertos, publicación en loopback y transmisión exacta de entrada binaria y argumentos.

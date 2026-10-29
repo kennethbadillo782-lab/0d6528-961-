@@ -91,3 +91,7 @@ La guía `EMPEZAR-AQUI.md` explica los comandos, límites y fuentes oficiales. N
 ## Actualización de autorización
 
 El usuario autorizó el 29/10/2026 usar un proyecto nuevo gratuito de Supabase con datos ficticios. Nunca proyectos existentes ni gastos. Inicio de sesión pendiente. Appetize autenticado, carga manual requerida por permiso de archivos de Opera. La primera ejecución de XCTest fue cancelada durante el arranque sin resultados; la segunda, con arranque explícito y sin clones paralelos, terminó correctamente.
+
+## Backend remoto desplegado
+
+Con autorización expresa del usuario se creó un proyecto FREE separado y se desplegaron seis migraciones y catalog-api. Pasan 49 pruebas HTTP reales en HTTPS. Se corrigió dependencia de permisos automáticos mediante grants explícitos y se verificó la cabecera IP fiable del proxy. Ver DESPLIEGUE-PRUEBAS.md y cloud-tests.json. No hay datos de producción ni suscripciones pagadas. Autenticación/sincronización Swift siguen pendientes.
