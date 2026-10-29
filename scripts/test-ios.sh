@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p reports
+# Firma ad hoc local: sin ella el simulador niega el Llavero (sessionMissing).
 # Solo el bundle de PRUEBAS recibe secretos efímeros. Nunca la .app entregada.
 python3 - <<'PY'
 import os,json
@@ -28,7 +29,7 @@ except subprocess.TimeoutExpired: print('Arranque lento del simulador; xcodebuil
 PY
 xcodebuild -project ios/MiCatalogo.xcodeproj -scheme MiCatalogo -configuration Debug \
   -destination "platform=iOS Simulator,id=$udid" -parallel-testing-enabled NO -derivedDataPath build/TestDerivedData \
-  -resultBundlePath "reports/ios-$(date +%s).xcresult" CODE_SIGNING_ALLOWED=NO test \
+  -resultBundlePath "reports/ios-$(date +%s).xcresult" CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= test \
   2>&1 | tee reports/ios-tests.log
 
 # Captura del binario entregado, instalado y lanzado fuera del host XCTest.
