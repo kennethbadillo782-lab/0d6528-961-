@@ -23,7 +23,8 @@ echo "Destino real: $udid" | tee reports/ios-destination.txt
 xcrun simctl boot "$udid" 2>/dev/null || true
 python3 - "$udid" <<'PY' 2>&1 | tee reports/ios-boot.log
 import subprocess,sys
-subprocess.run(['xcrun','simctl','bootstatus',sys.argv[1],'-b'],check=True,timeout=240)
+try: subprocess.run(['xcrun','simctl','bootstatus',sys.argv[1],'-b'],check=True,timeout=600)
+except subprocess.TimeoutExpired: print('Arranque lento del simulador; xcodebuild seguirá esperando.')
 PY
 xcodebuild -project ios/MiCatalogo.xcodeproj -scheme MiCatalogo -configuration Debug \
   -destination "platform=iOS Simulator,id=$udid" -parallel-testing-enabled NO -derivedDataPath build/TestDerivedData \
@@ -34,7 +35,8 @@ xcodebuild -project ios/MiCatalogo.xcodeproj -scheme MiCatalogo -configuration D
 xcrun simctl boot "$udid" 2>/dev/null || true
 python3 - "$udid" <<'PY' 2>&1 | tee reports/ios-boot.log
 import subprocess,sys
-subprocess.run(['xcrun','simctl','bootstatus',sys.argv[1],'-b'],check=True,timeout=240)
+try: subprocess.run(['xcrun','simctl','bootstatus',sys.argv[1],'-b'],check=True,timeout=600)
+except subprocess.TimeoutExpired: print('Arranque lento del simulador; xcodebuild seguirá esperando.')
 PY
 xcrun simctl install "$udid" build/DerivedData/Build/Products/Debug-iphonesimulator/MiCatalogo.app
 xcrun simctl launch --terminate-running-process "$udid" com.micatalogo.moda | tee reports/ios-launch.txt
