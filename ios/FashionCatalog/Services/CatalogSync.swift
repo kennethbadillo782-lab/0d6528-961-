@@ -29,6 +29,8 @@ final class SupabaseCatalogTransport: CatalogCloudTransport {
         guard session.user.id.uuidString.lowercased() == owner else { throw CloudError.accountMismatch }
         var components = URLComponents(url:base.appendingPathComponent(path),resolvingAgainstBaseURL:false)!
         components.queryItems = query.isEmpty ? nil : query
+        // "+" de las fechas del servidor (+00:00) llegaría a PostgREST como espacio: 400.
+        components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of:"+",with:"%2B")
         var request = URLRequest(url:components.url!); request.httpMethod = method; request.httpBody = body; request.timeoutInterval = 30
         request.setValue(account.publicKey,forHTTPHeaderField:"apikey"); request.setValue("Bearer \(session.accessToken)",forHTTPHeaderField:"Authorization")
         request.setValue(content,forHTTPHeaderField:"Content-Type"); if let prefer { request.setValue(prefer,forHTTPHeaderField:"Prefer") }
