@@ -2,7 +2,7 @@
 
 ## Resultado y límites
 
-El backend Supabase completo de pruebas funciona en Docker local, limitado a `127.0.0.1`. Pasaron 48 comprobaciones HTTP, 137 ataques SQL sobre el stack real y la ejecución programada de limpieza. **El criterio final de éxito del usuario todavía no se ha alcanzado**: no hay `.app`, `.ipa`, sesión Appetize ni comunicación de la app nativa con Supabase. Faltan conexión a una cuenta de compilación macOS y la implementación de autenticación/sincronización nativas. No se ejecutaron operaciones contra producción ni servicios con coste.
+El backend Supabase completo de pruebas funciona en Docker local, limitado a `127.0.0.1`. Pasaron 48 comprobaciones HTTP, 137 ataques SQL sobre el stack real y la ejecución programada de limpieza. **El criterio final de éxito del usuario todavía no se ha alcanzado**: no hay `.app`, `.ipa`, sesión Appetize ni comunicación de la app nativa con Supabase. GitHub está conectado y la primera compilación macOS está en ejecución mediante Actions; sigue pendiente la implementación de autenticación/sincronización nativas. No se ejecutaron operaciones contra producción ni servicios con coste.
 
 ## Evidencia ejecutada
 
@@ -26,7 +26,7 @@ El backend Supabase completo de pruebas funciona en Docker local, limitado a `12
 | Supabase HTTP real | 48/48 | `live-tests.json`, `live-console.log` | Auth, Edge Function, PostgREST y Storage reales |
 | SQL sobre Supabase real | 137/137 | `stack-sql.json`, `stack-sql.log` | PostgreSQL 17.11; fixtures revertidos con ROLLBACK |
 | Cron real | trabajo diario activo y ejecución comprobada | `runtime-state.json` | Job efímero de prueba ejecutó api_cleanup y se eliminó |
-| Compilación / XCTest / UI iOS | no ejecutados | no hay artefacto binario | Sin Mac ni cuenta CI |
+| Compilación / XCTest / UI iOS | no ejecutados | no hay artefacto binario | GitHub Actions macos-26 en ejecución |
 
 No sumar pruebas SQL con los tests de API para presentarlas como validación de un servicio desplegado. Los ataques con otra identidad son fixtures de regresión en DB descartables; no se añadió soporte multiusuario a la aplicación.
 
@@ -78,7 +78,7 @@ También pasan los ataques adicionales de mínimo privilegio, presupuestos, sepa
 
 ## Pendiente para satisfacer el objetivo completo
 
-1. Crear repositorio privado, Codemagic y Appetize; autorizar una ejecución macOS según la cuota de la cuenta.
+1. Repositorio privado creado en kennethbadillo782-lab/MiCatalogo. Verificar compilación manual Actions 40960250796; acceso a Appetize pendiente de inicio de sesión.
 2. Compilar realmente; corregir errores de Xcode y ejecutar XCTest.
 3. Abrir el ZIP nativo en Appetize y ejecutar la matriz de UI.
 4. Para Appetize y la futura sincronización, autorizar un Supabase de pruebas accesible por HTTPS. El stack local ya está probado; el localhost del simulador externo no es este PC.
