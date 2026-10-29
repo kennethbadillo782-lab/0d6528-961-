@@ -43,12 +43,26 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "5.0"
         PRODUCT_BUNDLE_IDENTIFIER: com.micatalogo.moda.tests
+  MiCatalogoUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - FashionCatalogUITests
+    dependencies:
+      - target: MiCatalogo
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.micatalogo.moda.uitests
 schemes:
   MiCatalogo:
     build:
       targets:
         MiCatalogo: all
         MiCatalogoTests: [test]
+        MiCatalogoUITests: [test]
     test:
       targets:
         - MiCatalogoTests
+        - MiCatalogoUITests

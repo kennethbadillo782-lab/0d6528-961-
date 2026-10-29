@@ -15,3 +15,11 @@ xcodebuild -project ios/MiCatalogo.xcodeproj -scheme MiCatalogo -configuration D
   -destination "platform=iOS Simulator,id=$udid" -derivedDataPath build/TestDerivedData \
   -resultBundlePath "reports/ios-$(date +%s).xcresult" CODE_SIGNING_ALLOWED=NO test \
   2>&1 | tee reports/ios-tests.log
+
+# Captura del binario entregado, instalado y lanzado fuera del host XCTest.
+xcrun simctl boot "$udid" 2>/dev/null || true
+xcrun simctl bootstatus "$udid" -b
+xcrun simctl install "$udid" build/DerivedData/Build/Products/Debug-iphonesimulator/MiCatalogo.app
+xcrun simctl launch --terminate-running-process "$udid" com.micatalogo.moda | tee reports/ios-launch.txt
+sleep 3
+xcrun simctl io "$udid" screenshot reports/ios-launch.png
