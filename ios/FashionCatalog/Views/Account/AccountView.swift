@@ -44,6 +44,7 @@ struct AccountView: View {
                 displayCard
                 backupCard
                 syncCard
+                ChatGPTAccessView()
                 aboutCard
             }
             .padding(.horizontal, Theme.hPadding)
