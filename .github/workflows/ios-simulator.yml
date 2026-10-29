@@ -1,0 +1,33 @@
+name: iOS Simulator
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-simulator
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install XcodeGen
+        run: command -v xcodegen || brew install xcodegen
+      - name: Build native simulator app
+        run: bash scripts/build-simulator.sh
+      - name: Run XCTest on iPhone
+        run: bash scripts/test-ios.sh
+      - name: Save native build and diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: MiCatalogo-simulator
+          retention-days: 1
+          path: |
+            build/MiCatalogo-simulator.zip
+            reports/ios-*.log
+            reports/ios-*.txt
+            reports/ios-*.xcresult
