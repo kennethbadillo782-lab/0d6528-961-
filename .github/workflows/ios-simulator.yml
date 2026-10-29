@@ -19,6 +19,9 @@ jobs:
       - name: Build native simulator app
         run: bash scripts/build-simulator.sh
       - name: Run XCTest on iPhone
+        env:
+          MC_NATIVE_TOKEN_HASH: ${{ secrets.MC_NATIVE_TOKEN_HASH }}
+          MC_NATIVE_API_KEY: ${{ secrets.MC_NATIVE_API_KEY }}
         run: bash scripts/test-ios.sh
       - name: Save native build and diagnostics
         if: always()
