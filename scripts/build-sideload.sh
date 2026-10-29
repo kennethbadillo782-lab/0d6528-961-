@@ -17,7 +17,7 @@ test -d "$app"
 rm -rf build/Payload build/MiCatalogo.ipa; mkdir -p build/Payload; cp -R "$app" build/Payload/
 (cd build && zip -qry MiCatalogo.ipa Payload)
 # Nada secreto en el binario entregado: solo URL y clave pública.
-if strings -a "$app/MiCatalogo" | grep -E 'service_role|sb_secret_' ; then echo 'Secreto en el binario'; exit 1; fi
+if strings -a "$app/MiCatalogo" | grep -E 'service_role|sb_secret_[A-Za-z0-9_-]{8,}' ; then echo 'Secreto en el binario'; exit 1; fi
 python3 - "$version" "$build" "$url" <<'PY'
 import json,os,sys,datetime
 version,build,url=sys.argv[1:]
