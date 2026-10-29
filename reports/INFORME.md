@@ -2,7 +2,7 @@
 
 ## Resultado y límites
 
-El backend Supabase completo de pruebas funciona en Docker local, limitado a `127.0.0.1`. Pasaron 48 comprobaciones HTTP, 137 ataques SQL sobre el stack real y la ejecución programada de limpieza. **El criterio final de éxito del usuario todavía no se ha alcanzado**: no hay `.app`, `.ipa`, sesión Appetize ni comunicación de la app nativa con Supabase. GitHub está conectado y la primera compilación macOS está en ejecución mediante Actions; sigue pendiente la implementación de autenticación/sincronización nativas. No se ejecutaron operaciones contra producción ni servicios con coste.
+El backend Supabase completo de pruebas funciona en Docker local, limitado a `127.0.0.1`. Pasaron 48 comprobaciones HTTP, 137 ataques SQL sobre el stack real y la ejecución programada de limpieza. **El criterio final de éxito del usuario todavía no se ha alcanzado**: ya existe una `.app` ARM64 de simulador, pero siguen pendientes `.ipa`, sesión Appetize y comunicación de la app nativa con Supabase. La ejecución Actions 40960926235 compiló y pasó 8 pruebas unitarias/de integración y 1 UI. Sigue pendiente la implementación de autenticación/sincronización nativas. No se ejecutaron operaciones contra producción ni servicios con coste.
 
 ## Evidencia ejecutada
 
@@ -26,7 +26,7 @@ El backend Supabase completo de pruebas funciona en Docker local, limitado a `12
 | Supabase HTTP real | 48/48 | `live-tests.json`, `live-console.log` | Auth, Edge Function, PostgREST y Storage reales |
 | SQL sobre Supabase real | 137/137 | `stack-sql.json`, `stack-sql.log` | PostgreSQL 17.11; fixtures revertidos con ROLLBACK |
 | Cron real | trabajo diario activo y ejecución comprobada | `runtime-state.json` | Job efímero de prueba ejecutó api_cleanup y se eliminó |
-| Compilación / XCTest / UI iOS | no ejecutados | no hay artefacto binario | GitHub Actions macos-26 en ejecución |
+| Compilación / XCTest / UI iOS | compilación correcta, 8 pruebas + 1 UI, cero fallos | ios-run.json, ios-tests.log, binario ZIP | Xcode 26.6; iPhone 17 Pro Max; cinco pestañas y relanzamiento |
 
 No sumar pruebas SQL con los tests de API para presentarlas como validación de un servicio desplegado. Los ataques con otra identidad son fixtures de regresión en DB descartables; no se añadió soporte multiusuario a la aplicación.
 
@@ -87,3 +87,7 @@ También pasan los ataques adicionales de mínimo privilegio, presupuestos, sepa
 7. Configurar certificados/UDID/perfil Apple para la IPA y probar en iPhone físico.
 
 La guía `EMPEZAR-AQUI.md` explica los comandos, límites y fuentes oficiales. Ningún secreto real se incluye en el ZIP, en el código ni en los informes.
+
+## Actualización de autorización
+
+El usuario autorizó el 29/10/2026 usar un proyecto nuevo gratuito de Supabase con datos ficticios. Nunca proyectos existentes ni gastos. Inicio de sesión pendiente. Appetize autenticado, carga manual requerida por permiso de archivos de Opera. La primera ejecución de XCTest fue cancelada durante el arranque sin resultados; la segunda, con arranque explícito y sin clones paralelos, terminó correctamente.

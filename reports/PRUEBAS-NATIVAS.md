@@ -1,6 +1,6 @@
-# Matriz de pruebas nativas — todas pendientes de ejecución
+# Matriz de pruebas nativas — ejecución parcial verificada
 
-Esta matriz es un procedimiento; no contiene resultados de una app compilada. Usar una instalación nueva y datos ficticios. Registrar para cada fallo: build, dispositivo/runtime, pasos, esperado, observado, captura/log sin secretos, causa, cambio y resultado de repetición.
+Verificado en Actions 40960926235: 5 pruebas de red, 3 de copias/SwiftData y 1 UI de cinco pestañas y relanzamiento. Las filas restantes son un procedimiento pendiente; no equivalen a una auditoría UI completa. Usar una instalación nueva y datos ficticios. Registrar para cada fallo: build, dispositivo/runtime, pasos, esperado, observado, captura/log sin secretos, causa, cambio y resultado de repetición.
 
 | Área | Prueba y resultado esperado |
 |---|---|

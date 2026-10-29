@@ -1,6 +1,6 @@
 # MiCatalogo: preparación para pruebas nativas
 
-Estado al 29 de octubre de 2026: **todavía no existe una compilación iOS ni una sesión Appetize**. El código nativo sigue guardando localmente. La integración de autenticación y sincronización con Supabase no está implementada.
+Estado al 29 de octubre de 2026: **compilación iOS de simulador completada; carga en Appetize pendiente**. El código nativo sigue guardando localmente. La integración de autenticación y sincronización con Supabase no está implementada.
 
 El backend completo de pruebas ya funciona localmente en Docker. Se prepararon herramientas, pruebas y workflows de compilación. No se modificó ningún Supabase remoto ni se creó ningún recurso de pago. El informe detallado está en `reports/INFORME.md`.
 
@@ -15,7 +15,7 @@ El backend completo de pruebas ya funciona localmente en Docker. Se prepararon h
 - Chromium: recorrido de 120 interacciones más 60 tras importar una copia maliciosa; cero XSS, enlaces peligrosos o errores JavaScript. Esta comprobación corresponde solo a la vista previa web.
 - Validación de YAML, TOML, plist, XML y sintaxis de scripts. No equivale a ejecutar los servicios ni a compilar Swift.
 
-Los resultados reproducibles están en `reports/`. No se certifica seguridad en producción ni funcionamiento de la app nativa.
+Los resultados reproducibles están en `reports/`. La compilación nativa pasó 8 pruebas unitarias/de integración y 1 prueba UI que recorre las cinco pestañas y relanza la app en iPhone 17 Pro Max. No se certifican los flujos nativos restantes ni seguridad en producción.
 
 ## 1. Repetir las pruebas en Windows
 
