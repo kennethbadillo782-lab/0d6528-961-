@@ -158,7 +158,7 @@ final class CatalogSync: ObservableObject {
             }
         }
         for e in entries where !e.isDeleted && !local.contains(where: { $0.table == e.table && $0.key == e.rowKey }) {
-            if e.pendingSince == nil { e.pendingSince = Date() }
+            if e.observedFingerprint != "__deleted__" { e.pendingSince = Date(); e.observedFingerprint = "__deleted__" }
         }
         try context.save() // Persistir la cola ANTES de los envíos; sobrevive a fallos y cierre.
         for table in CloudMapping.tables {
@@ -225,13 +225,13 @@ final class CatalogSync: ObservableObject {
         var entries = try context.fetch(FetchDescriptor<CloudSyncEntry>()).filter { $0.owner == owner }
         for s in snapshots {
             if let e = entries.first(where: { $0.table == s.table && $0.rowKey == s.key }) {
-                if e.fingerprint != s.fingerprint && e.pendingSince == nil { e.pendingSince = s.modified ?? Date() }
+                if e.fingerprint != s.fingerprint && e.observedFingerprint != s.fingerprint { e.pendingSince = s.modified ?? Date(); e.observedFingerprint = s.fingerprint }
             } else {
-                let e = CloudSyncEntry(owner:owner,table:s.table,key:s.key); e.pendingSince = s.modified ?? Date(); context.insert(e); entries.append(e)
+                let e = CloudSyncEntry(owner:owner,table:s.table,key:s.key); e.pendingSince = s.modified ?? Date(); e.observedFingerprint = s.fingerprint; context.insert(e); entries.append(e)
             }
         }
         for e in entries where !e.isDeleted && !snapshots.contains(where: { $0.table == e.table && $0.key == e.rowKey }) {
-            if e.pendingSince == nil { e.pendingSince = Date() }
+            if e.observedFingerprint != "__deleted__" { e.pendingSince = Date(); e.observedFingerprint = "__deleted__" }
         }
         try context.save()
     }

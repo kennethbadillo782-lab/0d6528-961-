@@ -4,6 +4,11 @@ cd "$(dirname "$0")/.."
 command -v xcodebuild >/dev/null || { echo 'Se necesita macOS con Xcode 16 o posterior.'; exit 1; }
 command -v xcodegen >/dev/null || { echo 'Instala XcodeGen: brew install xcodegen'; exit 1; }
 mkdir -p build reports
+python3 - <<'PY'
+from pathlib import Path
+for p in Path('reports').glob('ios-*'):
+    if p.is_file(): p.unlink()
+PY
 xcodebuild -version
 python3 scripts/configure-cloud.py
 (cd ios && xcodegen generate)

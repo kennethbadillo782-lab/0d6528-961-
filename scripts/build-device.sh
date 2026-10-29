@@ -4,6 +4,7 @@ cd "$(dirname "$0")/.."
 : "${IOS_BUNDLE_ID:?Configura tu bundle id en Codemagic y en ios_signing}"
 : "${APPLE_TEAM_ID:?Configura el Team ID de Apple, no una contraseña}"
 mkdir -p build reports
+python3 scripts/configure-cloud.py
 (cd ios && xcodegen generate)
 # use-profiles debe ver el mismo bundle id que el perfil, antes del archive.
 python3 - <<'PY'

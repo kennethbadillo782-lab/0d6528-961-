@@ -8,6 +8,7 @@ final class CloudSyncEntry {
     var table: String = ""
     var rowKey: String = ""
     var fingerprint: String = ""
+    var observedFingerprint: String = ""
     var remoteStamp: String = ""
     var pendingSince: Date?
     var isDeleted: Bool = false

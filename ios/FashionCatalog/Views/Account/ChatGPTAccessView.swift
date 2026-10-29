@@ -95,15 +95,15 @@ struct ChatGPTAccessView: View {
     @MainActor private func createKey() async {
         guard let client = account.client else { return }
         busy = true
-        do { let key: String = try await client.rpc("create_api_key",params:CreateCatalogKey(p_label:String(label.prefix(60)),p_scopes:scope.split(separator:",").map(String.init),p_days:180)).execute().value; newKey = key }
+        do { let key: String = try await client.rpc("create_api_key",params:CreateCatalogKey(p_label:String(label.prefix(60)),p_scopes:scope.split(separator:",").map(String.init),p_days:180)).execute().value; newKey = key; await refresh() }
         catch { message = "No se pudo crear la clave. Revisa la conexión; el máximo es 5 claves activas." }
-        busy = false; await refresh()
+        busy = false
     }
     @MainActor private func revoke(_ id: String) async {
         guard let client = account.client else { return }
         busy = true
-        do { try await client.from("api_keys").update(["revoked_at":CloudMapping.stamp(Date())]).eq("id",value:id).execute() }
+        do { try await client.from("api_keys").update(["revoked_at":CloudMapping.stamp(Date())]).eq("id",value:id).execute(); await refresh() }
         catch { message = "No se pudo revocar. Comprueba internet y vuelve a intentarlo." }
-        busy = false; await refresh()
+        busy = false
     }
 }

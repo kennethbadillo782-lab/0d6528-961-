@@ -37,6 +37,7 @@ try {
   const password = randomBytes(32).toString('hex');
   const users = await http('/auth/v1/admin/users');
   check(users.status === 200, 'Auth del proyecto de pruebas responde');
+  if (users.data.users.some(u => u.email !== email)) throw Error('La cuenta personal ya está configurada. Usar XCTest nativo; no se modifica su identidad.');
   const existing = users.data.users.find(u => u.email === email);
   // La única cuenta local es ficticia. Nunca se toca una cuenta real.
   const user = await http(existing ? `/auth/v1/admin/users/${existing.id}` : '/auth/v1/admin/users', { method: existing ? 'PUT' : 'POST', body: { email, password, email_confirm: true } });

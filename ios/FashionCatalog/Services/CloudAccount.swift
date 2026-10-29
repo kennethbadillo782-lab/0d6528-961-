@@ -62,7 +62,7 @@ final class CloudAccount: ObservableObject {
         } catch { message = "No se pudo enviar el enlace. Revisa el correo y la conexión; espera un minuto antes de reintentar." }
     }
     func acceptLink(_ raw: String) async {
-        guard let client, let url = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
+        guard raw.count <= 8192, let client, let url = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)), url.user == nil, url.password == nil, (url.port == nil || url.port == 443),
               (url.scheme == "micatalogo" && url.host == "auth-callback") || (url.scheme == "https" && url.host == base?.host && url.path == "/auth/v1/verify") else { message = "Enlace de acceso no válido."; return }
         busy = true; defer { busy = false }
         do {
@@ -78,7 +78,10 @@ final class CloudAccount: ObservableObject {
     func signOut() async {
         guard let client else { return }
         do { try await client.auth.signOut(); email = nil; message = "Sesión cerrada. La copia local permanece en este dispositivo." }
-        catch { message = "No se pudo cerrar la sesión en el servidor. Revisa internet y vuelve a intentarlo." }
+        catch {
+            if client.auth.currentSession == nil { email = nil; message = "Sesión local borrada. Sin internet no se pudo confirmar la revocación en el servidor." }
+            else { message = "No se pudo cerrar la sesión. Revisa la conexión y vuelve a intentarlo." }
+        }
     }
 }
 

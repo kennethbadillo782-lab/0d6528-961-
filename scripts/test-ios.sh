@@ -9,6 +9,7 @@ from pathlib import Path
 Path('ios/FashionCatalogTests/NativeSecrets.json').write_text(json.dumps({k:os.environ.get(k,'') for k in ['MC_NATIVE_TOKEN_HASH','MC_NATIVE_API_KEY']}))
 PY
 trap 'rm -f ios/FashionCatalogTests/NativeSecrets.json' EXIT
+python3 scripts/configure-cloud.py
 (cd ios && xcodegen generate)
 # Preferir iPhone 17 Pro Max; dejar registrada cualquier alternativa disponible.
 udid=$(xcrun simctl list devices available -j | python3 -c '
@@ -20,7 +21,10 @@ print(d["udid"])
 ')
 echo "Destino real: $udid" | tee reports/ios-destination.txt
 xcrun simctl boot "$udid" 2>/dev/null || true
-xcrun simctl bootstatus "$udid" -b
+python3 - "$udid" <<'PY' 2>&1 | tee reports/ios-boot.log
+import subprocess,sys
+subprocess.run(['xcrun','simctl','bootstatus',sys.argv[1],'-b'],check=True,timeout=240)
+PY
 xcodebuild -project ios/MiCatalogo.xcodeproj -scheme MiCatalogo -configuration Debug \
   -destination "platform=iOS Simulator,id=$udid" -parallel-testing-enabled NO -derivedDataPath build/TestDerivedData \
   -resultBundlePath "reports/ios-$(date +%s).xcresult" CODE_SIGNING_ALLOWED=NO test \
@@ -28,7 +32,10 @@ xcodebuild -project ios/MiCatalogo.xcodeproj -scheme MiCatalogo -configuration D
 
 # Captura del binario entregado, instalado y lanzado fuera del host XCTest.
 xcrun simctl boot "$udid" 2>/dev/null || true
-xcrun simctl bootstatus "$udid" -b
+python3 - "$udid" <<'PY' 2>&1 | tee reports/ios-boot.log
+import subprocess,sys
+subprocess.run(['xcrun','simctl','bootstatus',sys.argv[1],'-b'],check=True,timeout=240)
+PY
 xcrun simctl install "$udid" build/DerivedData/Build/Products/Debug-iphonesimulator/MiCatalogo.app
 xcrun simctl launch --terminate-running-process "$udid" com.micatalogo.moda | tee reports/ios-launch.txt
 sleep 3
