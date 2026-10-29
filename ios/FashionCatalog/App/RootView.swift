@@ -41,6 +41,7 @@ struct RootView: View {
         }
         .task {
             SeedService.seedIfNeeded(context)
+            if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil { return }
             await CloudAccount.shared.restore()
             // Reintento periódico con cola persistente; también cubre cambios offline y de la API.
             while !Task.isCancelled {

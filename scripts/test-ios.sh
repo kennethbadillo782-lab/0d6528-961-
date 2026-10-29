@@ -2,6 +2,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p reports
+# Solo el bundle de PRUEBAS recibe secretos efímeros. Nunca la .app entregada.
+python3 - <<'PY'
+import os,json
+from pathlib import Path
+Path('ios/FashionCatalogTests/NativeSecrets.json').write_text(json.dumps({k:os.environ.get(k,'') for k in ['MC_NATIVE_TOKEN_HASH','MC_NATIVE_API_KEY']}))
+PY
+trap 'rm -f ios/FashionCatalogTests/NativeSecrets.json' EXIT
+(cd ios && xcodegen generate)
 # Preferir iPhone 17 Pro Max; dejar registrada cualquier alternativa disponible.
 udid=$(xcrun simctl list devices available -j | python3 -c '
 import sys,json

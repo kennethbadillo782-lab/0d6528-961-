@@ -9,7 +9,7 @@ def allowed(path):
     return (path.is_file() and not any(part in excluded for part in rel.parts)
         and path.suffix not in {'.pyc', '.p12', '.p8', '.mobileprovision', '.xcconfig'}
         and (not path.name.startswith('.env') or path.name == '.env.example')
-        and rel.as_posix() != 'reports/source-manifest.json')
+        and rel.as_posix() not in {'reports/source-manifest.json', 'ios/FashionCatalogTests/NativeSecrets.json'})
 files = sorted(p for p in ROOT.rglob('*') if allowed(p))
 manifest = [{'file': p.relative_to(ROOT).as_posix(), 'sha256': hashlib.sha256(p.read_bytes()).hexdigest()} for p in files]
 manifest_path = ROOT / 'reports/source-manifest.json'
