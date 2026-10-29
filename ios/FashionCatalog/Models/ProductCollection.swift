@@ -7,6 +7,7 @@ final class ProductCollection {
     var id: UUID = UUID()
     var name: String = ""
     var cloudCoverPath: String?
+    var cloudCoverHash: String = ""
     /// Portada elegida manualmente. Si es nil, se usa automáticamente el último producto.
     @Attribute(.externalStorage) var coverData: Data?
     var sortOrder: Int = 0

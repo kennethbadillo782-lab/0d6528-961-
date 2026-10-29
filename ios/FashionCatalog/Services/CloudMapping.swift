@@ -94,7 +94,8 @@ enum CloudMapping {
             let existing = try context.fetch(FetchDescriptor<ProductCollection>()).first { $0.id == id }
             if deleted { if let existing { context.delete(existing) }; return }
             let c = existing ?? ProductCollection(name:""); if existing == nil { c.id = id; context.insert(c) }
-            c.name = text(r,"name",80); c.sortOrder = r["sort_order"] as? Int ?? 0; c.cloudCoverPath = r["cover_path"] as? String
+            c.name = text(r,"name",80); c.sortOrder = r["sort_order"] as? Int ?? 0; let path = r["cover_path"] as? String
+            if c.cloudCoverPath != path { c.coverData = nil; c.cloudCoverHash = ""; c.cloudCoverPath = path }
         } else if table == "products" {
             guard let id = UUID(uuidString:key) else { throw CloudError.invalidData }
             let existing = try context.fetch(FetchDescriptor<Product>()).first { $0.id == id }

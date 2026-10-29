@@ -135,6 +135,17 @@ final class CatalogSync: ObservableObject {
                 if image.data == data { image.cloudPath = path; image.cloudUploadedHash = hash }
             }
         }
+        for collection in try context.fetch(FetchDescriptor<ProductCollection>()) {
+            if let data = collection.coverData {
+                let hash = SHA256.hash(data:data).map { String(format:"%02x",$0) }.joined()
+                if collection.cloudCoverHash != hash || collection.cloudCoverPath == nil {
+                    guard let jpeg = ImageService.downsample(data,maxPixel:1600)?.jpegData(compressionQuality:0.78) else { throw CloudError.invalidData }
+                    let path = "\(owner)/\(collection.id.uuidString.lowercased())/\(UUID().uuidString.lowercased()).jpg"
+                    try await transport.upload(jpeg,path:path)
+                    if collection.coverData == data { collection.cloudCoverPath = path; collection.cloudCoverHash = hash }
+                }
+            } else if !collection.cloudCoverHash.isEmpty { collection.cloudCoverPath = nil; collection.cloudCoverHash = "" }
+        }
         let local = try CloudMapping.snapshots(context)
         var entries = try context.fetch(FetchDescriptor<CloudSyncEntry>())
         for e in entries where e.remoteStamp.isEmpty && e.table == "collections" && !local.contains(where: { $0.table == e.table && $0.key == e.rowKey }) { context.delete(e) }
@@ -194,6 +205,13 @@ final class CatalogSync: ObservableObject {
             let data = try await transport.download(path)
             guard let decoded = ImageService.downsample(data,maxPixel:1600), let jpeg = decoded.jpegData(compressionQuality:0.85) else { throw CloudError.invalidData }
             if image.cloudPath == path { image.data = jpeg; image.cloudUploadedHash = SHA256.hash(data:jpeg).map { String(format:"%02x",$0) }.joined() }
+        }
+        for collection in try context.fetch(FetchDescriptor<ProductCollection>()) where collection.coverData == nil {
+            if let path = collection.cloudCoverPath {
+                let data = try await transport.download(path)
+                guard let decoded = ImageService.downsample(data,maxPixel:1600), let jpeg = decoded.jpegData(compressionQuality:0.85) else { throw CloudError.invalidData }
+                if collection.cloudCoverPath == path { collection.coverData = jpeg; collection.cloudCoverHash = SHA256.hash(data:jpeg).map { String(format:"%02x",$0) }.joined() }
+            }
         }
         // La descarga de caché no es una modificación de la foto del usuario.
         let after = try CloudMapping.snapshots(context)
