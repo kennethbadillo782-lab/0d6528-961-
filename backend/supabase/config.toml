@@ -46,3 +46,6 @@ policy = "per_worker"
 enabled = false
 [functions.catalog-api]
 verify_jwt = false
+
+[functions.catalog-mcp]
+verify_jwt = false
