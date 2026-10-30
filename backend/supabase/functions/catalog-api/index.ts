@@ -25,7 +25,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.103.2";
 import { agentOf, CHINESE_PLATFORMS, cleanURL, duplicateKey, embeddedOriginal, guessCategory, ipInCidrs, platformOf } from "../_shared/links.ts";
 import { cleanText, parseImages, parseNameList, parseProductFields, STATUSES, type ImageInput, type ProductFields, ValidationError } from "../_shared/validation.ts";
-import { allowlistFor, downloadImage, ImageError } from "../_shared/images.ts";
+import { allowlistFor, downloadImage, ImageError, weidianPageImages } from "../_shared/images.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -242,6 +242,17 @@ async function probeImages(ctx: Ctx, images: ImageInput[]) {
   }
 }
 
+/** Fotos fallidas en el historial del propietario: solo el sitio y el motivo, nunca la dirección completa. */
+async function noteImageErrors(ctx: Ctx, productId: string, errors: { url: string; error: string }[]) {
+  if (!errors.length) return;
+  const items = errors.slice(0, 10).map((e) => {
+    let host = "";
+    try { host = new URL(e.url).hostname; } catch { /* enlace no válido */ }
+    return { host, error: e.error.slice(0, 120) };
+  });
+  await audit(ctx, "image_errors", productId, { count: errors.length, items });
+}
+
 async function saveImages(ctx: Ctx, productId: string, images: ImageInput[]) {
   if (!images.length) return { saved: 0, errors: [] as { url: string; error: string }[] };
   await consume(ctx, "image-day", 86400, ctx.limits.image, images.length);
@@ -401,9 +412,12 @@ async function route(ctx: Ctx, method: string, path: string, params: URLSearchPa
   if (seg.length === 1 && method === "POST") {
     await consume(ctx, "create-day", 86400, ctx.limits.create);
     const fields = parseProductFields(body, false);
-    const images = parseImages(body.images);
+    const given = parseImages(body.images);
     const collectionRefs = parseNameList(body.collections, "collections");
     const row = await deriveFields(ctx, fields, true);
+    // Sin fotos de ChatGPT: se intentan sacar de la página del artículo (Weidian las carga con JavaScript).
+    const images: ImageInput[] = given.length ? given
+      : (await weidianPageImages(String(row.original_url ?? ""))).map((url) => ({ url, kind: "official" as const }));
     // Clave sin lectura ("solo guardar"): la respuesta es SIEMPRE la misma, exista o no el producto,
     // tenga o no fotos válidas. Así no se puede usar para averiguar qué hay en tu catálogo.
     const quiet = !can(ctx, "read");
@@ -411,7 +425,18 @@ async function route(ctx: Ctx, method: string, path: string, params: URLSearchPa
     if (body.allow_duplicate !== true) {
       const dup = await findDuplicate(ctx, String(row.normalized_url ?? ""));
       // Sin permiso de lectura no se revela qué producto era (evita usar el 409 para espiar el catálogo).
-      if (dup && quiet) { await audit(ctx, "duplicate_ignored", dup.id as string, {}); await probeImages(ctx, images); return json(202, RECEIVED); }
+      if (dup && quiet) {
+        await audit(ctx, "duplicate_ignored", dup.id as string, {});
+        // Si el que ya tenías se guardó sin fotos, se completan; la respuesta es la misma en ambos casos.
+        const { count } = await db.from("product_images").select("id", { count: "exact", head: true })
+          .eq("product_id", dup.id as string).eq("owner_id", ctx.owner).is("deleted_at", null);
+        if (images.length && (count ?? 0) === 0) {
+          const r = await saveImages(ctx, dup.id as string, images).catch(() => ({ saved: 0, errors: [] as { url: string; error: string }[] }));
+          if (r.saved) await audit(ctx, "add_images", dup.id as string, { saved: r.saved });
+          await noteImageErrors(ctx, dup.id as string, r.errors);
+        } else await probeImages(ctx, images);
+        return json(202, RECEIVED);
+      }
       if (dup) throw new HttpError(409, "Este producto ya está guardado", { existing: dup });
     }
     const { data: created, error } = await db.from("products").insert({ ...row, owner_id: ctx.owner, source: "chatgpt" }).select(SUMMARY).single();
@@ -450,6 +475,7 @@ async function route(ctx: Ctx, method: string, path: string, params: URLSearchPa
       imageResult = { saved: 0, errors: images.map((i) => ({ url: i.url.slice(0, 300), error: msg })) };
     }
     if (imageResult.saved) await audit(ctx, "add_images", created.id as string, { saved: imageResult.saved });
+    await noteImageErrors(ctx, created.id as string, imageResult.errors);
     if (quiet) return json(202, RECEIVED);
     return json(201, { product: created, images_saved: imageResult.saved, image_errors: imageResult.errors, collections: cols.map((c) => c.name) });
   }

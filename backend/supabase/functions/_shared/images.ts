@@ -101,6 +101,45 @@ export async function assertPublicHost(u: URL, allowlist?: string[]): Promise<vo
   }
 }
 
+/**
+ * Fotos de un artículo de Weidian cuando ChatGPT no pudo verlas (la página las carga con JavaScript).
+ * Solo se pide la dirección fija https://weidian.com/item.html?itemID=<número>: nunca un host recibido.
+ * Devuelve enlaces de su CDN de producto (si.geilicdn.com/weidian…), que luego pasan por downloadImage.
+ */
+export async function weidianPageImages(originalUrl: string, fetcher: typeof fetch = fetch, max = 9): Promise<string[]> {
+  let u: URL;
+  try { u = new URL(originalUrl); } catch { return []; }
+  const host = u.hostname.toLowerCase();
+  if (host !== "weidian.com" && !host.endsWith(".weidian.com")) return [];
+  const item = (u.searchParams.get("itemID") ?? u.searchParams.get("itemId") ?? "").trim();
+  if (!/^\d{4,20}$/.test(item)) return [];
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetcher(`https://weidian.com/item.html?itemID=${item}`, { redirect: "manual", signal: ctrl.signal, headers: { "User-Agent": UA, "Accept": "text/html" } });
+    if (res.status !== 200 || !res.body) return [];
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = []; let size = 0;
+    while (size < 3_000_000) {
+      const { done, value } = await reader.read();
+      if (done || !value) break;
+      chunks.push(value); size += value.byteLength;
+    }
+    await reader.cancel().catch(() => {});
+    const all = new Uint8Array(size); let at = 0;
+    for (const c of chunks) { all.set(c, at); at += c.byteLength; }
+    const html = new TextDecoder().decode(all);
+    const seen = new Set<string>(); const out: string[] = [];
+    for (const m of html.matchAll(/si\.geilicdn\.com\\?\/(weidian[A-Za-z0-9_-]{8,120}\.(?:jpg|jpeg|png|webp)(?:\.webp)?)/g)) {
+      if (seen.has(m[1])) continue;
+      seen.add(m[1]);
+      out.push(`https://si.geilicdn.com/${m[1]}?w=750&h=750&cp=1`);
+      if (out.length >= max) break;
+    }
+    return out;
+  } catch { return []; } finally { clearTimeout(timer); }
+}
+
 export async function downloadImage(rawUrl: string, fetcher: typeof fetch = fetch, allowlist?: string[]): Promise<Downloaded> {
   let url: URL;
   try { url = new URL(rawUrl); } catch { throw new ImageError("Enlace no válido"); }

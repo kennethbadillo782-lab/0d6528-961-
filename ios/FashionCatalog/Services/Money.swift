@@ -96,6 +96,13 @@ enum Money {
         var errorDescription: String? { "El servicio de tasas no respondió correctamente." }
     }
 
+    /// Al abrir la app: actualiza las tasas si faltan o tienen más de un día. Sin conexión no hace nada.
+    static func refreshIfStale() async {
+        let newest = supported.filter { $0 != "USD" }.compactMap { rate(for: $0)?.updated }.min()
+        if let newest, Date().timeIntervalSince(newest) < 24 * 3600 { return }
+        _ = try? await fetchRates()
+    }
+
     /// Usa Frankfurter (tasas de referencia del Banco Central Europeo, gratuito y sin clave).
     @discardableResult
     static func fetchRates() async throws -> Date {

@@ -179,6 +179,15 @@ struct ProductDetailView: View {
                     .font(.system(size: 14, weight: .medium))
                 }
             }
+            if let price = product.priceCurrent, product.currency != "USD" {
+                let _ = ratesVersion
+                if let usd = Money.toUSD(price, code: product.currency) {
+                    Text("≈ " + Money.format(usd, code: "USD") + " USD")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Theme.textSecondary)
+                        .padding(.top, -4)
+                }
+            }
             Text(product.displayName)
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(.white)
