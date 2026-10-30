@@ -14,6 +14,9 @@ xcodebuild -project ios/MiCatalogo.xcodeproj -scheme MiCatalogo -configuration R
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= build 2>&1 | tee reports/ios-sideload-build.log
 app='build/DeviceDerivedData/Build/Products/Release-iphoneos/MiCatalogo.app'
 test -d "$app"
+# SideStore rechaza la IPA si su CFBundleVersion no coincide con la fuente.
+actual=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist")
+[ "$actual" = "$build" ] || { echo "CFBundleVersion $actual != $build"; exit 1; }
 rm -rf build/Payload build/MiCatalogo.ipa; mkdir -p build/Payload; cp -R "$app" build/Payload/
 (cd build && zip -qry MiCatalogo.ipa Payload)
 # Nada secreto en el binario entregado: solo URL y clave pública.
