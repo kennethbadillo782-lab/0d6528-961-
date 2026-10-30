@@ -168,7 +168,11 @@ final class PhotoBackfill: ObservableObject {
                     .first(where: { $0.name.lowercased() == "itemid" })?.value,
                   let fixed = PhotoSources.itemURL(platform: "weidian", id: item) else { break }
             guard let html = await LinkImportService.html(fixed) else { return ([], "Weidian no respondió.", []) }
-            switch PhotoSources.weidianPhotos(html: html, productName: productName, price: price, listingModel: listingModel) {
+            // El análisis (JSON de cientos de combinaciones) fuera del hilo principal: la app no se traba.
+            let extraction = await Task.detached(priority: .utility) {
+                PhotoSources.weidianPhotos(html: html, productName: productName, price: price, listingModel: listingModel)
+            }.value
+            switch extraction {
             case .photos(let urls): return (urls, nil, [])
             case .ambiguous(let why, let options):
                 return ([], why, options.map { Choice(name: $0.name, image: $0.image, price: $0.price) })

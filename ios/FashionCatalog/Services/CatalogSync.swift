@@ -127,6 +127,8 @@ final class CatalogSync: ObservableObject {
         // Solo sube contenido binario nuevo; rutas aleatorias evitan sobreescribir una foto remota.
         for p in try context.fetch(FetchDescriptor<Product>()) where !p.isDemo {
             for image in p.images {
+                // Ya subida: no se vuelve a leer del disco (las fotos no se editan, solo se añaden o borran).
+                if !image.cloudPath.isEmpty && !image.cloudUploadedHash.isEmpty { continue }
                 guard let data = image.data else { continue }
                 let hash = SHA256.hash(data:data).map { String(format:"%02x",$0) }.joined()
                 if image.cloudUploadedHash == hash && !image.cloudPath.isEmpty { continue }

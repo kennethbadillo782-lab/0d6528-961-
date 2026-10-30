@@ -52,6 +52,12 @@ enum CloudMapping {
     static func text(_ row: CloudRow, _ key: String, _ max: Int = 5000) -> String { String((row[key] as? String ?? "").prefix(max)) }
     static func link(_ row: CloudRow, _ key: String) -> String { NetworkSafety.webURL(text(row,key,2048))?.absoluteString ?? "" }
     @MainActor
+    /// Huella de la foto. Una foto subida o descargada no cambia (solo se añaden o se borran), así que se
+    /// reutiliza la guardada en vez de leer y resumir la imagen del disco en cada sincronización.
+    static func localHash(_ i: ProductImage) -> String {
+        if !i.cloudPath.isEmpty && !i.cloudUploadedHash.isEmpty { return i.cloudUploadedHash }
+        return i.data.map { SHA256.hash(data:$0).map { String(format:"%02x",$0) }.joined() } ?? ""
+    }
     static func snapshots(_ context: ModelContext) throws -> [CloudSnapshot] {
         var result: [CloudSnapshot] = []
         let products = try context.fetch(FetchDescriptor<Product>()).filter { !$0.isDemo }
@@ -68,7 +74,7 @@ enum CloudMapping {
             row["agent_links"] = p.agentLinks.map { ["name":$0.name,"url":$0.url] }
             result.append(.init(table:"products",key:p.id.uuidString.lowercased(),row:row,modified:p.updatedAt))
             for i in p.images {
-                result.append(.init(table:"product_images",key:i.id.uuidString.lowercased(),row:["id":i.id.uuidString.lowercased(),"product_id":p.id.uuidString.lowercased(),"source_url":i.remoteURL,"storage_path":i.cloudPath,"kind":i.kindRaw,"position":i.order,"content_type":"image/jpeg","local_data_hash":i.data.map { SHA256.hash(data:$0).map { String(format:"%02x",$0) }.joined() } ?? ""]))
+                result.append(.init(table:"product_images",key:i.id.uuidString.lowercased(),row:["id":i.id.uuidString.lowercased(),"product_id":p.id.uuidString.lowercased(),"source_url":i.remoteURL,"storage_path":i.cloudPath,"kind":i.kindRaw,"position":i.order,"content_type":"image/jpeg","local_data_hash":localHash(i)]))
             }
             for c in p.collections {
                 let row = ["product_id":p.id.uuidString.lowercased(),"collection_id":c.id.uuidString.lowercased()]
@@ -121,7 +127,7 @@ enum CloudMapping {
             let i = existing ?? ProductImage(data:nil); if existing == nil { i.id = id; context.insert(i); product.images.append(i) }
             i.remoteURL = link(r,"source_url"); i.kindRaw = ImageKind(rawValue:text(r,"kind"))?.rawValue ?? "manual"; i.order = r["position"] as? Int ?? 0
             let path = text(r,"storage_path",400)
-            if i.cloudPath != path { i.data = nil; i.cloudPath = path }
+            if i.cloudPath != path { i.data = nil; i.cloudPath = path; i.cloudUploadedHash = "" }
         } else if table == "product_collections" {
             guard let pid = UUID(uuidString:text(r,"product_id")), let cid = UUID(uuidString:text(r,"collection_id")), let p = try context.fetch(FetchDescriptor<Product>()).first(where: { $0.id == pid }) else { return }
             if deleted { p.collections.removeAll { $0.id == cid } }
