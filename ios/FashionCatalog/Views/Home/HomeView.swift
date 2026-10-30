@@ -110,7 +110,7 @@ struct HomeView: View {
                 NavigationLink(value: tile.route) {
                     PhotoTile(title: tile.title, subtitle: nil,
                               image: visibleProducts.first(where: tile.matches)?.coverImage,
-                              symbol: tile.symbol, aspect: 0.8)
+                              symbol: tile.symbol, aspect: 0.72)
                 }
                 .buttonStyle(.plain)
             }
@@ -261,28 +261,31 @@ struct HomeView: View {
 struct BrandTile: View {
     let name: String
 
-    /// Todas las marcas en la misma tarjeta clara: el logo verificado o, si no hay, su nombre como logotipo.
+    /// Como la referencia: tarjetas cuadradas oscuras, todas iguales, con el logo en blanco
+    /// (los logos de color se muestran tal cual) o el nombre de la marca como logotipo.
     var body: some View {
         let shown = BrandLibrary.displayName(name)
         Group {
             if let logo = BrandLibrary.logo(name) {
                 Image(uiImage: logo)
+                    .renderingMode(BrandLibrary.logoHasColor(name) ? .original : .template)
                     .resizable()
                     .scaledToFit()
-                    .padding(10)
+                    .foregroundStyle(.white)
+                    .padding(14)
             } else {
-                Text(shown.uppercased())
-                    .font(.system(size: 15, weight: .heavy))
-                    .tracking(-0.3)
-                    .foregroundStyle(Color(hex: 0x111111))
+                Text(shown)
+                    .font(.system(size: 15, weight: .medium, design: .serif))
+                    .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
                     .lineLimit(shown.contains(" ") ? 2 : 1)
-                    .minimumScaleFactor(0.45)
+                    .minimumScaleFactor(0.5)
                     .padding(.horizontal, 6)
             }
         }
-        .frame(width: 66, height: 58)
-        .background(Color(hex: 0xF2F2F2), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .frame(width: 68, height: 68)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.07), lineWidth: 0.5))
         .accessibilityLabel(shown)
     }
 }
@@ -328,8 +331,8 @@ struct PhotoTile: View {
                 }
                 .padding(10)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.06), lineWidth: 0.5))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.white.opacity(0.06), lineWidth: 0.5))
     }
 }
 

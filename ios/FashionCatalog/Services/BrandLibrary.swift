@@ -9,6 +9,8 @@ enum BrandLibrary {
         let name: String
         let aliases: [String]
         let logo: Bool
+        /// Logo con colores propios (no se tiñe de blanco). Por defecto, monocromo.
+        var logoColor: Bool? = nil
     }
 
     private static let entries: [Entry] = {
@@ -39,6 +41,8 @@ enum BrandLibrary {
     static func displayName(_ brand: String) -> String {
         byKey[key(brand)]?.name ?? brand.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    static func logoHasColor(_ brand: String) -> Bool { byKey[key(brand)]?.logoColor ?? false }
 
     /// Logo verificado incluido en la app, si existe para esa marca.
     static func logo(_ brand: String) -> UIImage? {

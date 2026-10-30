@@ -16,8 +16,9 @@ struct RootView: View {
                 .tabItem { Label("Explorar", systemImage: "magnifyingglass") }
                 .tag(AppTab.explore)
 
+            // Hueco para el botón central morado (va encima, en el overlay de abajo).
             Color.clear
-                .tabItem { Label("Agregar", systemImage: "plus.app.fill") }
+                .tabItem { Text(" ") }
                 .tag(AppTab.add)
 
             NavigationStack { SavedView().withAppRoutes() }
@@ -39,6 +40,8 @@ struct RootView: View {
         .sheet(item: $appState.addRequest) { request in
             AddProductView(request: request)
         }
+        .overlay(alignment: .bottom) { addButton }
+        .overlay(alignment: .top) { StatusBarBlur() }
         .overlay(alignment: .top) {
             if let toast = appState.toast {
                 ToastView(message: toast)
@@ -67,6 +70,37 @@ struct RootView: View {
         .onOpenURL { url in
             Task { await CloudAccount.shared.acceptLink(url.absoluteString); await CatalogSync.shared.run(context:context) }
         }
+    }
+}
+
+extension RootView {
+    /// Botón central destacado de la referencia: cuadrado redondeado lavanda sobre la barra.
+    var addButton: some View {
+        Button { appState.presentAdd() } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 50, height: 42)
+                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .shadow(color: Theme.accent.opacity(0.45), radius: 10, y: 3)
+        }
+        .accessibilityLabel("Agregar producto")
+        .padding(.bottom, 4)
+        .ignoresSafeArea(.keyboard)
+    }
+}
+
+/// Desenfoque oscuro fijo detrás de la hora y la batería: el contenido que sube no se mezcla con ellas.
+struct StatusBarBlur: View {
+    var body: some View {
+        GeometryReader { geo in
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay(Theme.background.opacity(0.5))
+                .frame(height: geo.safeAreaInsets.top)
+                .ignoresSafeArea(edges: .top)
+        }
+        .allowsHitTesting(false)
     }
 }
 

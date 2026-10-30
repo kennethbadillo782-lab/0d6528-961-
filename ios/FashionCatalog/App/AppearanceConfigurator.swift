@@ -21,10 +21,11 @@ enum AppearanceConfigurator {
 
         let tab = UITabBarAppearance()
         tab.configureWithOpaqueBackground()
-        tab.backgroundColor = background
-        tab.shadowColor = UIColor(white: 1, alpha: 0.06)
+        // Más oscura que el contenido y con borde visible: la barra no se mezcla con lo de detrás.
+        tab.backgroundColor = UIColor(red: 10 / 255, green: 10 / 255, blue: 12 / 255, alpha: 1)
+        tab.shadowColor = UIColor(white: 1, alpha: 0.09)
         let normal = UIColor(red: 0.62, green: 0.64, blue: 0.68, alpha: 1)
-        let selected = UIColor(red: 40 / 255, green: 123 / 255, blue: 1, alpha: 1)
+        let selected = UIColor(red: 139 / 255, green: 124 / 255, blue: 246 / 255, alpha: 1)
         for item in [tab.stackedLayoutAppearance, tab.inlineLayoutAppearance, tab.compactInlineLayoutAppearance] {
             item.normal.iconColor = normal
             item.normal.titleTextAttributes = [
