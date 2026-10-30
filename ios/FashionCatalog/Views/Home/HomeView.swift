@@ -40,6 +40,8 @@ struct HomeView: View {
         .scrollDismissesKeyboard(.interactively)
         .background(Theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        // Sin barra de título: desenfoque progresivo detrás de la hora para que el contenido no choque con ella.
+        .overlay(alignment: .top) { StatusBarBlur() }
         .sheet(isPresented: $showActivity) { ActivityView() }
         .sheet(isPresented: $showAccount) {
             NavigationStack { AccountView().withAppRoutes() }

@@ -42,7 +42,6 @@ struct RootView: View {
             AddProductView(request: request)
         }
         .overlay(alignment: .bottom) { addButton }
-        .overlay(alignment: .top) { StatusBarBlur() }
         .overlay(alignment: .top) {
             if let toast = appState.toast {
                 ToastView(message: toast)
@@ -98,15 +97,26 @@ extension RootView {
     }
 }
 
-/// Desenfoque oscuro fijo detrás de la hora y la batería: el contenido que sube no se mezcla con ellas.
+/// Desenfoque progresivo detrás de la hora y la batería, como en la app de Claude: muy marcado arriba
+/// y desvaneciéndose poco a poco hacia abajo, sin ningún borde que corte la pantalla.
 struct StatusBarBlur: View {
     var body: some View {
         GeometryReader { geo in
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .overlay(Theme.background.opacity(0.5))
-                .frame(height: geo.safeAreaInsets.top)
-                .ignoresSafeArea(edges: .top)
+            let height = geo.safeAreaInsets.top + 36
+            let fade = LinearGradient(stops: [
+                .init(color: .black, location: 0),
+                .init(color: .black, location: 0.45),
+                .init(color: .black.opacity(0.6), location: 0.7),
+                .init(color: .clear, location: 1),
+            ], startPoint: .top, endPoint: .bottom)
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                LinearGradient(colors: [Theme.background.opacity(0.55), Theme.background.opacity(0)],
+                               startPoint: .top, endPoint: .bottom)
+            }
+            .mask(fade)
+            .frame(height: height)
+            .ignoresSafeArea(edges: .top)
         }
         .allowsHitTesting(false)
     }

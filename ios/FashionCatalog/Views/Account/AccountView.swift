@@ -52,6 +52,8 @@ struct AccountView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        // Sin barra de título: desenfoque progresivo detrás de la hora para que el contenido no choque con ella.
+        .overlay(alignment: .top) { StatusBarBlur() }
         .alert("Tasa \(editingCurrency ?? "") → USD", isPresented: Binding(
             get: { editingCurrency != nil }, set: { if !$0 { editingCurrency = nil } }
         )) {
