@@ -1,108 +1,165 @@
 import Foundation
 import SwiftData
 
-/// Completa solo las fotos de productos guardados sin ninguna (por ejemplo desde ChatGPT, cuando la
-/// tienda carga las fotos con JavaScript o bloquea la descarga). Lee la página del producto desde el
-/// iPhone, guarda las fotos en el dispositivo y la sincronización normal las sube a la nube.
+/// Busca las fotos del anuncio de productos que no tienen ninguna (las de ChatGPT tienen prioridad: solo
+/// actúa si no llegó ninguna foto del anuncio). Lee la página de la tienda desde el iPhone, guarda las fotos
+/// en el dispositivo y la sincronización normal las sube a la nube. Lo que no se consigue queda pendiente
+/// con su motivo y se reintenta más tarde.
 @MainActor
-final class PhotoBackfill {
+final class PhotoBackfill: ObservableObject {
     static let shared = PhotoBackfill()
+
+    struct State: Codable, Equatable {
+        var attempts = 0
+        var nextTry: Date = .distantPast
+        var reason = ""
+        var working = false
+    }
+
+    @Published private(set) var states: [UUID: State] = [:]
     /// Pocos productos por pasada para no gastar datos ni batería; el resto sigue en la siguiente.
-    private let perRun = 3
-    /// Un producto sin suerte se reintenta más tarde (la tienda puede estar caída o limitar).
-    private let retryAfter: TimeInterval = 6 * 3600
-    private let attemptsKey = "photo.backfill.attempts"
+    private let perRun = 2
+    /// 10 min, 1 h, 6 h y después una vez al día.
+    private let backoff: [TimeInterval] = [600, 3600, 6 * 3600, 24 * 3600]
+    private let storeKey = "photo.backfill.state"
     private var busy = false
 
-    func run(context: ModelContext) async {
-        guard !busy, !CatalogSync.shared.isSyncing else { return }
-        busy = true; defer { busy = false }
-        guard let products = try? context.fetch(FetchDescriptor<Product>()) else { return }
-        var attempts = UserDefaults.standard.dictionary(forKey: attemptsKey) as? [String: Double] ?? [:]
-        let now = Date().timeIntervalSince1970
-        let pending = products.filter { p in
-            !p.isDemo && p.images.isEmpty && !Self.pages(for: p).isEmpty
-                && now - (attempts[p.id.uuidString] ?? 0) > retryAfter
+    private init() {
+        if let data = UserDefaults.standard.data(forKey: storeKey),
+           let saved = try? JSONDecoder().decode([UUID: State].self, from: data) {
+            states = saved.mapValues { var s = $0; s.working = false; return s }
         }
-        for product in pending.prefix(perRun) {
-            attempts[product.id.uuidString] = now
-            UserDefaults.standard.set(attempts, forKey: attemptsKey)
-            let found = await Self.images(for: product)
-            // Puede haber recibido fotos (sincronización o edición) mientras se descargaban.
-            guard !found.isEmpty, product.images.isEmpty, product.modelContext != nil else { continue }
-            for (index, item) in found.enumerated() {
-                let image = ProductImage(data: item.data, remoteURL: item.url.absoluteString, kind: .official, order: index)
+    }
+
+    static func needsPhotos(_ p: Product) -> Bool {
+        !p.isDemo && !p.images.contains { $0.kind == .official }
+    }
+
+    func state(for product: Product) -> State? { states[product.id] }
+
+    /// Reintento inmediato desde la ficha (por ejemplo tras iniciar sesión en la tienda).
+    func retryNow(_ product: Product, context: ModelContext) async {
+        states[product.id, default: State()].nextTry = .distantPast
+        await attempt(product, context: context)
+    }
+
+    func run(context: ModelContext) async {
+        guard !busy, !CatalogSync.shared.isSyncing,
+              let products = try? context.fetch(FetchDescriptor<Product>()) else { return }
+        let now = Date()
+        let due = products.filter { Self.needsPhotos($0) && (states[$0.id]?.nextTry ?? .distantPast) <= now }
+        for product in due.prefix(perRun) { await attempt(product, context: context) }
+        // Olvidar productos que ya tienen fotos o se borraron.
+        let alive = Set(products.filter(Self.needsPhotos).map(\.id))
+        if states.keys.contains(where: { !alive.contains($0) }) { states = states.filter { alive.contains($0.key) }; persist() }
+    }
+
+    private func attempt(_ product: Product, context: ModelContext) async {
+        guard !busy else { return }
+        busy = true; defer { busy = false }
+        var state = states[product.id] ?? State()
+        state.working = true; states[product.id] = state
+
+        let outcome = await Self.find(for: product)
+        state.working = false
+        // Puede haber recibido fotos del anuncio (sincronización o edición) mientras se descargaban.
+        if case .found(let photos) = outcome, Self.needsPhotos(product), product.modelContext != nil {
+            let start = (product.images.map(\.order).max() ?? -1) + 1
+            for (i, photo) in photos.enumerated() {
+                let image = ProductImage(data: photo.data, remoteURL: photo.url.absoluteString, kind: .official, order: start + i)
                 image.product = product
                 context.insert(image)
             }
             product.updatedAt = Date()
             try? context.save()
+            states[product.id] = nil
+        } else if case .found = outcome {
+            states[product.id] = nil
+        } else {
+            if case .pending(let reason) = outcome { state.reason = reason }
+            state.nextTry = Date().addingTimeInterval(backoff[min(state.attempts, backoff.count - 1)])
+            state.attempts += 1
+            states[product.id] = state
         }
+        persist()
     }
 
-    /// Páginas candidatas: la tienda original y, si no hay, los enlaces de agente (con su tienda embebida si la traen).
+    private func persist() {
+        if let data = try? JSONEncoder().encode(states) { UserDefaults.standard.set(data, forKey: storeKey) }
+    }
+
+    // MARK: Búsqueda
+
+    enum Outcome { case found([(url: URL, data: Data)]), pending(String) }
+
+    /// Páginas a consultar, en orden: la tienda original y después los agentes (convertidos a su tienda).
     static func pages(for product: Product) -> [URL] {
         var urls: [URL] = []
-        if let u = LinkImportService.cleanURL(product.originalURL) { urls.append(LinkImportService.embeddedOriginalURL(u) ?? u) }
-        for link in product.agentLinks {
-            guard let u = LinkImportService.cleanURL(link.url) else { continue }
-            if let inner = LinkImportService.embeddedOriginalURL(u) { urls.append(inner) }
+        let links = [product.originalURL] + product.agentLinks.map(\.url)
+        for raw in links {
+            guard let u = LinkImportService.cleanURL(raw) else { continue }
+            if let store = PhotoSources.storeURL(fromAgent: u) { urls.append(store) }
             urls.append(u)
         }
-        var seen = Set<String>()
-        return urls.filter { seen.insert($0.absoluteString).inserted }
+        return PhotoSources.unique(urls)
     }
 
-    static func images(for product: Product, limit: Int = 9) async -> [(url: URL, data: Data)] {
-        for page in pages(for: product) {
-            let candidates = await imageURLs(page: page)
+    static func find(for product: Product) async -> Outcome {
+        let pages = pages(for: product)
+        guard !pages.isEmpty else { return .pending("El producto no tiene enlace de la tienda. Añádelo al editarlo.") }
+        var reasons: [String] = []
+        for page in pages {
+            let (candidates, reason) = await candidates(page: page, productName: product.name)
+            if let reason { reasons.append(reason) }
             guard !candidates.isEmpty else { continue }
             var result: [(url: URL, data: Data)] = []
-            for url in candidates.prefix(limit) {
-                if let data = await ImageService.download(url, referer: referer(for: page, image: url)) { result.append((url, data)) }
+            for url in candidates.prefix(9) {
+                if let data = await ImageService.download(url, referer: referer(page: page, image: url)) { result.append((url, data)) }
             }
-            if !result.isEmpty { return result }
+            if !result.isEmpty { return .found(result) }
+            reasons.append("La tienda no dejó descargar las fotos.")
         }
-        return []
+        return .pending(reasons.first ?? "La página no muestra fotos sin iniciar sesión o cargó otra cosa.")
     }
 
-    /// Enlaces de fotos de una página. Weidian y Yupoo se leen de su HTML; el resto, por Open Graph y JSON-LD.
-    static func imageURLs(page: URL) async -> [URL] {
-        let host = (page.host ?? "").lowercased()
-        var target = page
-        // Weidian: la página fija del artículo trae las fotos de su CDN aunque luego las muestre con JavaScript.
-        if host == "weidian.com" || host.hasSuffix(".weidian.com"),
-           let item = URLComponents(url: page, resolvingAgainstBaseURL: false)?.queryItems?
-            .first(where: { $0.name.lowercased() == "itemid" })?.value,
-           item.range(of: "^\\d{4,20}$", options: .regularExpression) != nil,
-           let fixed = URL(string: "https://weidian.com/item.html?itemID=\(item)") {
-            target = fixed
+    /// Fotos candidatas del producto exacto en una página y, si no hay, el motivo.
+    static func candidates(page: URL, productName: String) async -> ([URL], String?) {
+        let store = PhotoSources.store(of: page)
+        switch store {
+        case .weidian:
+            guard let item = URLComponents(url: page, resolvingAgainstBaseURL: false)?.queryItems?
+                    .first(where: { $0.name.lowercased() == "itemid" })?.value,
+                  let fixed = PhotoSources.itemURL(platform: "weidian", id: item) else { break }
+            guard let html = await LinkImportService.html(fixed) else { return ([], "Weidian no respondió.") }
+            switch PhotoSources.weidianPhotos(html: html, productName: productName) {
+            case .photos(let urls): return (urls, nil)
+            case .ambiguous(let why): return ([], why)
+            case .nothing: break
+            }
+        case .yupoo:
+            if let html = await LinkImportService.html(page) {
+                let photos = PhotoSources.yupooPhotos(html: html)
+                if !photos.isEmpty { return (photos, nil) }
+            }
+        case .other:
+            // Agentes sin la tienda en el enlace: sus páginas son aplicaciones web sin fotos útiles.
+            if LinkImportService.agentName(for: page) != nil { return ([], nil) }
+            if let html = await LinkImportService.html(page) {
+                let photos = LinkImportService.parse(html: html, baseURL: page).imageURLs
+                if !photos.isEmpty { return (photos, nil) }
+            }
+        case .taobao, .tmall, .ali1688:
+            break
         }
-        guard let html = await LinkImportService.html(target) else { return [] }
-        var found = weidianImages(in: html) + yupooImages(in: html)
-        if found.isEmpty { found = LinkImportService.parse(html: html, baseURL: target).imageURLs }
-        var seen = Set<String>()
-        return found.filter { NetworkSafety.isPublic($0) && seen.insert($0.absoluteString).inserted }
+        // Páginas que cargan las fotos con JavaScript (Taobao, 1688 y muchas otras): navegador invisible.
+        let rendered = await PageRenderer.render(page)
+        if !rendered.images.isEmpty { return (rendered.images, nil) }
+        if rendered.needsLogin { return ([], "La tienda pide iniciar sesión. Usa «Abrir página», inicia sesión y pulsa «Reintentar».") }
+        if rendered.blocked { return ([], "La tienda pidió una verificación anti-robots. Ábrela una vez desde «Abrir página».") }
+        return ([], nil)
     }
 
-    static func weidianImages(in html: String) -> [URL] {
-        matches(#"si\.geilicdn\.com\\?/(weidian[A-Za-z0-9_-]{8,120}\.(?:jpg|jpeg|png|webp)(?:\.webp)?)"#, in: html)
-            .compactMap { URL(string: "https://si.geilicdn.com/\($0)?w=750&h=750&cp=1") }
-    }
-
-    /// Álbumes de Yupoo: fotos grandes de photo.yupoo.com (solo se sirven con la página como Referer).
-    static func yupooImages(in html: String) -> [URL] {
-        matches(#"photo\.yupoo\.com\\?/([A-Za-z0-9_.-]{1,64}\\?/[A-Za-z0-9]{4,64})\\?/(?:big|medium|small|square)\.(?:jpg|jpeg|png|webp)"#, in: html)
-            .compactMap { URL(string: "https://photo.yupoo.com/\($0.replacingOccurrences(of: "\\", with: ""))/big.jpg") }
-    }
-
-    static func referer(for page: URL, image: URL) -> String? {
+    static func referer(page: URL, image: URL) -> String? {
         (image.host ?? "").hasSuffix("yupoo.com") ? "https://\(page.host ?? "x.yupoo.com")/" : nil
-    }
-
-    private static func matches(_ pattern: String, in html: String) -> [String] {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
-        let ns = html as NSString
-        return regex.matches(in: html, range: NSRange(location: 0, length: ns.length)).map { ns.substring(with: $0.range(at: 1)) }
     }
 }

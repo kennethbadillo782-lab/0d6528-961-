@@ -17,6 +17,8 @@ struct ProductDetailView: View {
     @State var showEditor = false
     @State var showCollections = false
     @State var confirmDelete = false
+    @State var pageToOpen: URL?
+    @ObservedObject private var backfill = PhotoBackfill.shared
 
     private var images: [ProductImage] { product.orderedImages }
 
@@ -25,6 +27,7 @@ struct ProductDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 gallery
                 VStack(alignment: .leading, spacing: 16) {
+                    if PhotoBackfill.needsPhotos(product), !PhotoBackfill.pages(for: product).isEmpty { photoStatusCard }
                     titleAndPrice
                     tags
                     costSummary
@@ -66,6 +69,12 @@ struct ProductDetailView: View {
         .safeAreaInset(edge: .bottom) { bottomBar }
         .sheet(isPresented: $showEditor) { ProductEditorView(product: product) }
         .sheet(isPresented: $showCollections) { CollectionPickerSheet(product: product) }
+        .sheet(item: $pageToOpen) { url in
+            StorePageSheet(url: url) {
+                pageToOpen = nil
+                Task { await backfill.retryNow(product, context: context) }
+            }
+        }
         .fullScreenCover(isPresented: $showViewer) {
             ImageViewer(images: images, index: $selectedIndex)
         }
@@ -141,6 +150,43 @@ struct ProductDetailView: View {
                 .padding(.bottom, 10)
             }
         }
+    }
+
+    // MARK: Fotos pendientes
+
+    /// Estado de la búsqueda automática de fotos del anuncio (solo si el producto aún no tiene ninguna).
+    private var photoStatusCard: some View {
+        let state = backfill.state(for: product)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                if state?.working == true { ProgressView().tint(.white) } else { Image(systemName: "photo.badge.arrow.down") }
+                Text(state?.working == true ? "Buscando fotos del anuncio…" : "Fotos del anuncio pendientes")
+                    .font(.system(size: 15, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            if let state, !state.working {
+                if !state.reason.isEmpty {
+                    Text(state.reason).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+                }
+                Text("Nuevo intento automático \(state.nextTry.formatted(.relative(presentation: .named))).")
+                    .font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
+            } else if state == nil {
+                Text("Wearlist las buscará en la página de la tienda en unos segundos.")
+                    .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+            }
+            HStack(spacing: 10) {
+                Button("Reintentar") { Task { await backfill.retryNow(product, context: context) } }
+                    .disabled(state?.working == true)
+                if let page = PhotoBackfill.pages(for: product).first {
+                    Button("Abrir página") { pageToOpen = page }
+                }
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(Theme.blue)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     // MARK: Información principal
