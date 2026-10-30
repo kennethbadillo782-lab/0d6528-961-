@@ -46,6 +46,28 @@ final class PhotoSourcesTests: XCTestCase {
                        .photos([URL(string: "https://si.geilicdn.com/bred.jpg?w=1080&h=1080&cp=1")!]))
     }
 
+    func testNicknamesPriceAndCollabBreakTies() {
+        // "Bred" es "Black and red" en la tienda (caso real de Repsun).
+        let repsun = weidianPage(gallery: [], variants: [("FQ8138-600 Bull", "bull"), ("IX 8180-001 Black and red 2026", "bred26"),
+                                                        ("308497-007 Cool Gray", "grey")])
+        XCTAssertEqual(PhotoSources.weidianPhotos(html: repsun, productName: "Jordan 4 Bred 2026 — GX Batch"),
+                       .photos([URL(string: "https://si.geilicdn.com/bred26.jpg?w=1080&h=1080&cp=1")!]))
+        // Dos Black Cat en el mismo anuncio: decide el precio del producto.
+        let cats = [PhotoSources.Variant(name: "2025 Black Cat", image: URL(string: "https://a/2025.jpg")!, price: 440),
+                    PhotoSources.Variant(name: "Black Cat 2020", image: URL(string: "https://a/2020.jpg")!, price: 480),
+                    PhotoSources.Variant(name: "Black Red", image: URL(string: "https://a/br.jpg")!, price: 440)]
+        XCTAssertEqual(PhotoSources.bestVariant(for: "Jordan 4 Black Cat — GX Batch", price: 440, in: cats)?.name, "2025 Black Cat")
+        // Sin precio ni año que los separe, no se elige ninguno.
+        XCTAssertNil(PhotoSources.bestVariant(for: "Jordan 4 Black Cat", price: nil, in: cats))
+        XCTAssertEqual(PhotoSources.bestVariant(for: "Jordan 4 Black Cat 2020", price: nil, in: cats)?.name, "Black Cat 2020")
+        // "SB" desempata entre dos Navy; solo "SB" no identifica nada.
+        let navies = [PhotoSources.Variant(name: "SB Navy", image: URL(string: "https://a/sb.jpg")!),
+                      PhotoSources.Variant(name: "Midnight Navy", image: URL(string: "https://a/mn.jpg")!),
+                      PhotoSources.Variant(name: "SB Pine Green", image: URL(string: "https://a/pine.jpg")!)]
+        XCTAssertEqual(PhotoSources.bestVariant(for: "Air Jordan 4 SB Navy — GX Batch", price: nil, in: navies)?.name, "SB Navy")
+        XCTAssertNil(PhotoSources.bestVariant(for: "Jordan 4 SB", price: nil, in: navies))
+    }
+
     func testUnknownModelInMultiModelListingStaysPending() {
         let html = weidianPage(gallery: ["cover"], variants: [("GX AJ4 Military Blue", "blue"), ("GX AJ4 Cool Grey", "grey")])
         guard case .ambiguous = PhotoSources.weidianPhotos(html: html, productName: "Air Jordan 4 Black Cat — GX Batch") else {
@@ -74,13 +96,15 @@ final class PhotoSourcesTests: XCTestCase {
     /// Con TEST_RUNNER_PHOTO_LIVE=1: las tres Jordan reales de Weidian.
     func testLiveWeidianJordans() async throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["PHOTO_LIVE"] == "1", "Solo con red y PHOTO_LIVE=1")
-        let items = [("7815143816", "Jordan 4 Black Cat — GX Batch"), ("7242121077", "Jordan 4 Bred 2026 — GX Batch"),
-                     ("7327048497", "Jordan 4 SB Navy — GX Batch")]
-        for (id, name) in items {
+        let items: [(String, String, Double)] = [("7815143816", "Jordan 4 Black Cat — GX Batch", 440),
+                                                  ("7242121077", "Jordan 4 Bred 2026 — GX Batch", 430),
+                                                  ("7327048497", "Jordan 4 SB Navy — GX Batch", 450)]
+        for (id, name, price) in items {
             let html = await LinkImportService.html(URL(string: "https://weidian.com/item.html?itemID=\(id)")!)
             let data = html.flatMap(PhotoSources.weidianData)
-            print("LIVE \(id): gallery=\(data?.gallery.count ?? -1) variants=\(data?.variants.map(\.name) ?? [])")
-            print("LIVE \(id) → \(html.map { PhotoSources.weidianPhotos(html: $0, productName: name) } ?? .nothing)")
+            let matching = data?.variants.filter { $0.name.lowercased().contains("cat") || $0.name.lowercased().contains("navy") || $0.name.lowercased().contains("red") }
+            print("LIVE \(id): gallery=\(data?.gallery.count ?? -1) relevant=\(matching?.map { "\($0.name) ¥\($0.price ?? -1)" } ?? [])")
+            print("LIVE \(id) → \(html.map { PhotoSources.weidianPhotos(html: $0, productName: name, price: price) } ?? .nothing)")
         }
     }
 }

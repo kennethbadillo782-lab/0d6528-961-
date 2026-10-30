@@ -69,7 +69,12 @@ enum PhotoSources {
 
     // MARK: Weidian
 
-    struct Variant: Equatable { let name: String; let image: URL }
+    struct Variant: Equatable {
+        let name: String
+        let image: URL
+        /// Precio más bajo de ese modelo entre sus tallas, si la tienda lo da.
+        var price: Double? = nil
+    }
 
     /// Galería y modelos con foto de los datos que Weidian inserta en la página del artículo.
     static func weidianData(html: String) -> (gallery: [URL], variants: [Variant])? {
@@ -80,12 +85,19 @@ enum PhotoSources {
         let info = model["item_info"] as? [String: Any] ?? [:]
         var gallery = (info["imgs"] as? [String] ?? []).compactMap(cdnURL)
         if gallery.isEmpty, let head = info["item_head"] as? String, let u = cdnURL(head) { gallery = [u] }
+        let sku = model["sku_properties"] as? [String: Any] ?? [:]
+        // Cada combinación (modelo-talla) trae su precio; attr_ids = "38-3".
+        var prices: [String: Double] = [:]
+        for case let combo as [String: Any] in (sku["sku"] as? [String: Any] ?? [:]).values {
+            guard let ids = combo["attr_ids"] as? String, let price = Double(combo["price"] as? String ?? "") else { continue }
+            for id in ids.split(separator: "-").map(String.init) { prices[id] = min(prices[id] ?? price, price) }
+        }
         var variants: [Variant] = []
-        let attrs = (model["sku_properties"] as? [String: Any])?["attr_list"] as? [[String: Any]] ?? []
-        for attr in attrs {
+        for attr in sku["attr_list"] as? [[String: Any]] ?? [] {
             for value in attr["attr_values"] as? [[String: Any]] ?? [] {
                 if let name = value["attr_value"] as? String, let img = value["img"] as? String, let u = cdnURL(img) {
-                    variants.append(Variant(name: name, image: u))
+                    let id = (value["attr_id"] as? NSNumber)?.stringValue ?? (value["attr_id"] as? String) ?? ""
+                    variants.append(Variant(name: name, image: u, price: prices[id]))
                 }
             }
         }
@@ -95,11 +107,11 @@ enum PhotoSources {
     /// Fotos de Weidian del producto exacto. Si el anuncio agrupa varios modelos (cada uno con su foto),
     /// solo se acepta la foto del modelo cuyo nombre coincide con el del producto; si no hay coincidencia
     /// clara, no se elige ninguna para no mostrar otro modelo.
-    static func weidianPhotos(html: String, productName: String) -> Extraction {
+    static func weidianPhotos(html: String, productName: String, price: Double? = nil) -> Extraction {
         guard let data = weidianData(html: html) else { return .nothing }
         let distinctImages = Set(data.variants.map(\.image.absoluteString))
         if distinctImages.count >= 2 {
-            guard let match = bestVariant(for: productName, in: data.variants) else {
+            guard let match = bestVariant(for: productName, price: price, in: data.variants) else {
                 return .ambiguous("El anuncio tiene varios modelos y ninguno coincide claramente con el nombre del producto.")
             }
             return .photos([match.image])
@@ -110,34 +122,48 @@ enum PhotoSources {
 
     /// Palabras que no distinguen un modelo de otro dentro del mismo anuncio.
     private static let genericWords: Set<String> = [
-        "air", "jordan", "aj", "aj1", "aj4", "aj11", "nike", "retro", "og", "gx", "batch", "version", "ver", "new",
+        "air", "jordan", "aj", "aj1", "aj4", "aj11", "j4", "nike", "retro", "gx", "batch", "version", "ver", "new",
         "the", "de", "del", "la", "el", "con", "and", "with", "high", "low", "mid", "sneaker", "sneakers", "shoe", "shoes",
         "zapatillas", "tenis", "best", "selling", "arrive", "arrival", "upgraded", "leather", "women", "womens", "men", "mens",
+        "original", "box", "limited",
     ]
+    /// Colaboraciones y siglas: ayudan a desempatar, pero no bastan para identificar el modelo.
+    private static let weakWords: Set<String> = ["sb", "og", "ts", "ow", "un", "und", "amm", "x", "se", "sp", "pe"]
+    /// Apodos de colores que las tiendas escriben con los colores ("Bred" = "Black and Red").
+    private static let nicknames: [String: Set<String>] = ["bred": ["black", "red"]]
 
     static func tokens(_ text: String) -> [String] {
         let lowered = text.lowercased().folding(options: .diacriticInsensitive, locale: nil)
         return lowered.components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .map { $0 == "gray" ? "grey" : $0 }
             .filter { !$0.isEmpty && !genericWords.contains($0) && !($0.count == 1 && $0.allSatisfy(\.isNumber)) }
     }
 
-    static func bestVariant(for productName: String, in variants: [Variant]) -> Variant? {
+    /// Modelo del anuncio que corresponde al producto: todas sus palabras distintivas deben aparecer
+    /// (o su apodo, como Bred). Si varios cumplen, desempatan el precio y luego el año o la colaboración.
+    static func bestVariant(for productName: String, price: Double?, in variants: [Variant]) -> Variant? {
         // Lo que va tras "—" suele ser el lote o el vendedor ("GX Batch"), no el modelo.
         let base = productName.components(separatedBy: CharacterSet(charactersIn: "—–|")).first ?? productName
         let all = tokens(base)
-        let years = all.filter { $0.count == 4 && $0.hasPrefix("20") && $0.allSatisfy(\.isNumber) }
-        let words = Set(all.filter { !years.contains($0) })
-        guard !words.isEmpty else { return nil }
-        let scored = variants.map { v -> (Variant, Double) in
-            let vt = Set(tokens(v.name))
-            var score = Double(words.intersection(vt).count) / Double(words.count)
-            if !years.isEmpty, years.contains(where: vt.contains) { score += 0.1 }
-            return (v, score)
-        }.sorted { $0.1 > $1.1 }
-        guard let best = scored.first, best.1 >= 0.99 else { return nil }
-        // Empate con otro modelo de foto distinta: no se puede saber cuál es.
-        if scored.dropFirst().contains(where: { $0.1 >= best.1 && $0.0.image != best.0.image }) { return nil }
-        return best.0
+        let isYear = { (t: String) in t.count == 4 && t.hasPrefix("20") && t.allSatisfy(\.isNumber) }
+        let strong = Set(all.filter { !isYear($0) && !weakWords.contains($0) })
+        let extras = Set(all.filter { isYear($0) || weakWords.contains($0) })
+        guard !strong.isEmpty else { return nil }
+        func matches(_ word: String, _ vt: Set<String>) -> Bool {
+            vt.contains(word) || (nicknames[word].map { $0.isSubset(of: vt) } ?? false)
+        }
+        var candidates = variants.filter { v in let vt = Set(tokens(v.name)); return strong.allSatisfy { matches($0, vt) } }
+        func decided() -> Variant? { Set(candidates.map(\.image)).count == 1 ? candidates.first : nil }
+        if candidates.isEmpty { return nil }
+        if let one = decided() { return one }
+        if let price {
+            let samePrice = candidates.filter { $0.price.map { abs($0 - price) < 0.5 } ?? false }
+            if !samePrice.isEmpty { candidates = samePrice }
+            if let one = decided() { return one }
+        }
+        let scored = candidates.map { v in (v, extras.intersection(Set(tokens(v.name))).count) }.sorted { $0.1 > $1.1 }
+        guard let top = scored.first, top.1 > 0, !scored.dropFirst().contains(where: { $0.1 == top.1 && $0.0.image != top.0.image }) else { return nil }
+        return top.0
     }
 
     // MARK: Yupoo

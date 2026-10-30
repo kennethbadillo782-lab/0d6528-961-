@@ -109,7 +109,7 @@ final class PhotoBackfill: ObservableObject {
         guard !pages.isEmpty else { return .pending("El producto no tiene enlace de la tienda. Añádelo al editarlo.") }
         var reasons: [String] = []
         for page in pages {
-            let (candidates, reason) = await candidates(page: page, productName: product.name)
+            let (candidates, reason) = await candidates(page: page, productName: product.name, price: product.priceCurrent)
             if let reason { reasons.append(reason) }
             guard !candidates.isEmpty else { continue }
             var result: [(url: URL, data: Data)] = []
@@ -123,7 +123,7 @@ final class PhotoBackfill: ObservableObject {
     }
 
     /// Fotos candidatas del producto exacto en una página y, si no hay, el motivo.
-    static func candidates(page: URL, productName: String) async -> ([URL], String?) {
+    static func candidates(page: URL, productName: String, price: Double?) async -> ([URL], String?) {
         let store = PhotoSources.store(of: page)
         switch store {
         case .weidian:
@@ -131,7 +131,7 @@ final class PhotoBackfill: ObservableObject {
                     .first(where: { $0.name.lowercased() == "itemid" })?.value,
                   let fixed = PhotoSources.itemURL(platform: "weidian", id: item) else { break }
             guard let html = await LinkImportService.html(fixed) else { return ([], "Weidian no respondió.") }
-            switch PhotoSources.weidianPhotos(html: html, productName: productName) {
+            switch PhotoSources.weidianPhotos(html: html, productName: productName, price: price) {
             case .photos(let urls): return (urls, nil)
             case .ambiguous(let why): return ([], why)
             case .nothing: break
