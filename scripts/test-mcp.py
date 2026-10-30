@@ -41,7 +41,9 @@ service = next(x['api_key'] for x in keys if x['name'] == 'service_role')
 SH = {'apikey': service, 'Authorization': 'Bearer ' + service}
 rest = f'https://{ref}.supabase.co/rest/v1'
 _, _, u = http('GET', f'https://{ref}.supabase.co/auth/v1/admin/users', headers=SH)
-owner = next(x['id'] for x in json.loads(u)['users'] if x['email'] == 'kennethbadillo782@gmail.com')
+# Registro cerrado: la única cuenta es la del propietario (el correo no se guarda en el repositorio).
+all_users = json.loads(u)['users']; assert len(all_users) == 1, 'Se esperaba una sola cuenta'
+owner = all_users[0]['id']
 
 # --- Metadatos y rechazo sin autorización ---
 s, _, b = http('GET', BASE + '/.well-known/oauth-protected-resource'); pr = json.loads(b)

@@ -10,7 +10,8 @@ service=next(x['api_key'] for x in keys if x['name']=='service_role')
 def api(path,body=None,method=None):
  req=urllib.request.Request('https://'+ref+'.supabase.co'+path,data=None if body is None else json.dumps(body).encode(),headers={'apikey':service,'Authorization':'Bearer '+service,'Content-Type':'application/json'},method=method)
  with urllib.request.urlopen(req,timeout=30) as f: return json.load(f)
-users=api('/auth/v1/admin/users')['users'];assert len(users)==1 and users[0]['email']=='kennethbadillo782@gmail.com'
+# Registro cerrado: la única cuenta es la del propietario (el correo no se guarda en el repositorio).
+users=api('/auth/v1/admin/users')['users'];assert len(users)==1
 uid=users[0]['id']
 # No envía email; credencial de un solo uso para el test nativo.
 link=api('/auth/v1/admin/generate_link',{'type':'magiclink','email':users[0]['email']},'POST')

@@ -15,7 +15,8 @@ keys = json.loads(tool([cli, 'projects', 'api-keys', '--project-ref', ref, '--ou
 service = next(x['api_key'] for x in keys if x['name'] == 'service_role')
 req = urllib.request.Request(f'https://{ref}.supabase.co/auth/v1/admin/users', headers={'apikey': service, 'Authorization': 'Bearer ' + service})
 with urllib.request.urlopen(req, timeout=30) as f: users = json.load(f)['users']
-real = [u for u in users if u['email'] == 'kennethbadillo782@gmail.com']
+# Registro cerrado: la única cuenta es la del propietario (el correo no se guarda en el repositorio).
+real = users if len(users) == 1 else []
 assert len(real) == 1, 'Usuario propietario no encontrado'
 uid = real[0]['id']
 tool([cli, 'db', 'query', '--linked', '--project-ref', ref, "update public.api_keys set revoked_at=now() where label='ChatGPT MCP (solo guardar)' and revoked_at is null", '--output', 'json'])
