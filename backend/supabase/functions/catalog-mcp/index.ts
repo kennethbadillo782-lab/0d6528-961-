@@ -163,7 +163,7 @@ async function authorizeStart(url: URL) {
   const r = await fetch(SUPABASE_URL + "/auth/v1/otp?redirect_to=" + encodeURIComponent(back), {
     method: "POST", headers: { apikey: ANON_KEY, "content-type": "application/json" },
     body: JSON.stringify({ email, create_user: false, code_challenge: await sha256b64u(await authVerifier(n)), code_challenge_method: "s256" }) });
-  if (!r.ok) return text(429, "No se pudo enviar el correo ahora (Supabase permite uno por minuto). Espera un minuto y vuelve a conectar desde ChatGPT.");
+  if (!r.ok) return text(429, "Supabase no envió el correo: su servicio gratuito solo permite unos 2 correos de acceso por hora (contando los de la app). Espera hasta una hora después del último correo recibido y vuelve a conectar desde ChatGPT.");
   return text(200, `Mi Catálogo · Conectar ChatGPT
 
 ChatGPT pide permiso para AÑADIR productos a tu catálogo. No podrá leer, editar ni borrar lo que ya tienes.
@@ -202,25 +202,31 @@ async function authorizeCallback(url: URL) {
 
 async function tokenEndpoint(req: Request) {
   const form = await req.formData().catch(() => null);
-  if (!form) return json(400, { error: "invalid_request" });
+  // Motivo del rechazo como contador (sin datos de la petición) para diagnosticar clientes.
+  const fail = async (error: string, reason: string) => { await consume("mcp-tokfail-" + reason, 86400, 1_000_000).catch(() => {}); return json(400, { error }); };
+  if (!form) return await fail("invalid_request", "noform-" + (req.headers.get("content-type") ?? "none").split(";")[0].replace(/[^a-z/-]/gi, "").slice(0, 40));
   const grant = String(form.get("grant_type") ?? "");
   const resource = String(form.get("resource") ?? RESOURCE);
-  if (resource !== RESOURCE && resource !== PUBLIC_BASE) return json(400, { error: "invalid_target" });
+  if (resource !== RESOURCE && resource !== PUBLIC_BASE) return await fail("invalid_target", "resource");
   let sub: string, cid: string;
   if (grant === "authorization_code") {
     const p = await verify(String(form.get("code") ?? ""), "code");
-    if (!p || p.cid !== String(form.get("client_id") ?? "") || p.ru !== String(form.get("redirect_uri") ?? "")) return json(400, { error: "invalid_grant" });
+    if (!p) return await fail("invalid_grant", "code");
+    // Cliente público: si no envía client_id, el código ya lo ata al cliente que lo pidió.
+    const sentCid = form.get("client_id");
+    if (sentCid !== null && p.cid !== String(sentCid)) return await fail("invalid_grant", "client");
+    if (p.ru !== String(form.get("redirect_uri") ?? p.ru)) return await fail("invalid_grant", "redirect");
     const verifier = String(form.get("code_verifier") ?? "");
-    if (!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier) || await sha256b64u(verifier) !== p.cc) return json(400, { error: "invalid_grant" });
+    if (!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier) || await sha256b64u(verifier) !== p.cc) return await fail("invalid_grant", "pkce");
     // Un código solo vale una vez.
     // Ventana diaria alineada: un código de 120 s no puede caer en dos ventanas salvo a medianoche UTC.
-    if (!await consume("mcp-code-" + String(p.j), 86400, 1)) return json(400, { error: "invalid_grant" });
+    if (!await consume("mcp-code-" + String(p.j), 86400, 1)) return await fail("invalid_grant", "reused");
     sub = String(p.sub); cid = String(p.cid);
   } else if (grant === "refresh_token") {
     const p = await verify(String(form.get("refresh_token") ?? ""), "rt");
-    if (!p) return json(400, { error: "invalid_grant" });
+    if (!p) return await fail("invalid_grant", "refresh");
     sub = String(p.sub); cid = String(p.cid);
-  } else return json(400, { error: "unsupported_grant_type" });
+  } else return await fail("unsupported_grant_type", "grant");
   if (sub !== OWNER) return json(400, { error: "invalid_grant" });
   const access = await sign({ t: "at", sub, aud: RESOURCE, scope: SCOPE, cid, exp: now() + 3600 });
   const refresh = await sign({ t: "rt", sub, cid, exp: now() + 30 * 86400, j: crypto.randomUUID() });
@@ -397,6 +403,8 @@ Deno.serve(async (req) => {
   const path = url.pathname.replace(/^.*\/catalog-mcp/, "") || "/";
   if (!SECRET || SECRET.length < 32 || !API_KEY || !OWNER || !SERVICE_KEY || !ANON_KEY) return json(503, { error: "El servidor no está configurado." });
   try {
+    // Diagnóstico mínimo: cuántas veces se llama a cada ruta (sin contenido).
+    await consume("mcp-hit-" + req.method + path.replace(/[^a-z/.-]/gi, "").slice(0, 60), 86400, 1_000_000).catch(() => {});
     if (req.method === "GET" && (path === "/.well-known/oauth-protected-resource" || path === "/.well-known/oauth-protected-resource/mcp" || path === "/mcp/.well-known/oauth-protected-resource")) return json(200, protectedResource());
     if (req.method === "GET" && (path === "/.well-known/oauth-authorization-server" || path === "/.well-known/openid-configuration")) return json(200, authServer());
     if (path === "/mcp") return await mcp(req);
