@@ -51,13 +51,14 @@ enum CloudMapping {
     static func stamp(_ date: Date) -> String { ISO8601DateFormatter().string(from: date) }
     static func text(_ row: CloudRow, _ key: String, _ max: Int = 5000) -> String { String((row[key] as? String ?? "").prefix(max)) }
     static func link(_ row: CloudRow, _ key: String) -> String { NetworkSafety.webURL(text(row,key,2048))?.absoluteString ?? "" }
-    @MainActor
     /// Huella de la foto. Una foto subida o descargada no cambia (solo se añaden o se borran), así que se
     /// reutiliza la guardada en vez de leer y resumir la imagen del disco en cada sincronización.
+    @MainActor
     static func localHash(_ i: ProductImage) -> String {
         if !i.cloudPath.isEmpty && !i.cloudUploadedHash.isEmpty { return i.cloudUploadedHash }
         return i.data.map { SHA256.hash(data:$0).map { String(format:"%02x",$0) }.joined() } ?? ""
     }
+    @MainActor
     static func snapshots(_ context: ModelContext) throws -> [CloudSnapshot] {
         var result: [CloudSnapshot] = []
         let products = try context.fetch(FetchDescriptor<Product>()).filter { !$0.isDemo }
