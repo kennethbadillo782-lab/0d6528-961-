@@ -216,7 +216,7 @@ struct AccountView: View {
     private var aboutCard: some View {
         AccountCard(title: "Acerca de", symbol: "info.circle") {
             row("Versión", value: appVersion)
-            note("Mi Catálogo de Moda es un catálogo personal: no vende productos ni procesa pagos. Las marcas se usan solo como filtros de tu propio catálogo y las calidades que indican los vendedores no están verificadas por la app.")
+            note("Wearlist es un catálogo personal: no vende productos ni procesa pagos. Las marcas se usan solo como filtros de tu propio catálogo y las calidades que indican los vendedores no están verificadas por la app.")
         }
     }
 
@@ -285,7 +285,7 @@ struct AccountView: View {
             do {
                 let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
                 guard size <= 300_000_000 else {
-                    backupMessage = "El archivo es demasiado grande para ser una copia de Mi Catálogo."
+                    backupMessage = "El archivo es demasiado grande para ser una copia de Wearlist."
                     return
                 }
                 let data = try Data(contentsOf: url, options: .mappedIfSafe)
@@ -294,7 +294,7 @@ struct AccountView: View {
             } catch {
                 // Una importación fallida no deja el catálogo a medias.
                 context.rollback()
-                backupMessage = "El archivo no es una copia válida de Mi Catálogo."
+                backupMessage = "El archivo no es una copia válida de Wearlist."
             }
         }
     }

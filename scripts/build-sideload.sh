@@ -25,9 +25,9 @@ python3 - "$version" "$build" "$url" <<'PY'
 import json,os,sys,datetime
 version,build,url=sys.argv[1:]
 size=os.path.getsize('build/MiCatalogo.ipa')
-src={"name":"MiCatalogo privado","identifier":"com.micatalogo.source","apps":[{
- "name":"Mi Catálogo","bundleIdentifier":"com.micatalogo.moda","developerName":"Personal",
- "localizedDescription":"Catálogo personal de moda.","iconURL":"","versions":[{
+src={"name":"Wearlist","identifier":"com.micatalogo.source","apps":[{
+ "name":"Wearlist","bundleIdentifier":"com.micatalogo.moda","developerName":"Personal",
+ "localizedDescription":"Tu lista personal de moda.","iconURL":"","versions":[{
   "version":version,"buildVersion":build,"date":datetime.date.today().isoformat(),
   "downloadURL":url,"size":size,"minOSVersion":"17.0"}]}]}
 json.dump(src,open('build/source.json','w'),ensure_ascii=False,indent=1)

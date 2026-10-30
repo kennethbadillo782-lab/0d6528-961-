@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum Theme {
-    static let background = Color(hex: 0x080B0E)
+    static let background = Color.black
     static let card = Color(hex: 0x1B1F24)
     static let search = Color(hex: 0x20242A)
     static let chip = Color(hex: 0x24282D)

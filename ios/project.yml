@@ -13,7 +13,7 @@ targets:
     info:
       path: Config/Info.plist
       properties:
-        CFBundleDisplayName: Mi Catálogo
+        CFBundleDisplayName: Wearlist
         UIDesignRequiresCompatibility: true
         UIUserInterfaceStyle: Dark
         UILaunchScreen: {}

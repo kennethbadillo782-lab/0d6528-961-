@@ -119,23 +119,37 @@ struct HomeView: View {
 
     // MARK: Marcas
 
-    /// Marcas presentes en el catálogo (son filtros personales, no conexiones oficiales).
+    /// Solo las marcas que ya tienes guardadas: aparecen a medida que guardas productos de cada una.
     private var brands: [String] {
         var counts: [String: Int] = [:]
         var display: [String: String] = [:]
-        for p in products where !p.brand.trimmed.isEmpty {
-            let key = p.brand.loose
+        for p in visibleProducts where !p.brand.trimmed.isEmpty {
+            let key = BrandLibrary.key(p.brand)
+            guard !key.isEmpty else { continue }
             counts[key, default: 0] += 1
             if display[key] == nil { display[key] = p.brand.trimmed }
         }
         let sorted = counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
-        let found = sorted.compactMap { display[$0.key] }
-        return found.isEmpty ? ["Louis Vuitton", "Gucci", "Dior", "Coach", "Nike"] : found
+        return sorted.compactMap { display[$0.key] }
     }
 
+    @ViewBuilder
     private var brandsSection: some View {
+        let list = brands
+        if !list.isEmpty {
+            brandsRow(list)
+        }
+    }
+
+    private func brandsRow(_ brands: [String]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionTitle(title: "Marcas")
+            HStack(alignment: .firstTextBaseline) {
+                SectionTitle(title: "Marcas")
+                Spacer()
+                Text("\(brands.count) en tu lista")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.textSecondary)
+            }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(brands, id: \.self) { brand in
@@ -253,18 +267,30 @@ struct BrandTile: View {
         return words.compactMap { $0.first.map(String.init) }.joined().uppercased()
     }
 
-    /// Nombre en tipografía serif (no se reproducen logotipos oficiales).
+    /// Logo verificado sobre fondo claro (sin recolorear) o, si no hay, el nombre en serif.
     var body: some View {
-        Text(name.count <= 6 ? name : initials)
-            .font(.system(size: name.count <= 6 ? 17 : 22, weight: .semibold, design: .serif))
-            .foregroundStyle(.white)
-            .lineLimit(1)
-            .minimumScaleFactor(0.6)
-            .padding(.horizontal, 6)
-            .frame(width: 66, height: 58)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.06), lineWidth: 0.5))
-            .accessibilityLabel(name)
+        let shown = BrandLibrary.displayName(name)
+        Group {
+            if let logo = BrandLibrary.logo(name) {
+                Image(uiImage: logo)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(10)
+                    .frame(width: 66, height: 58)
+                    .background(Color(hex: 0xF2F2F2), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            } else {
+                Text(shown.count <= 6 ? shown : initials)
+                    .font(.system(size: shown.count <= 6 ? 17 : 22, weight: .semibold, design: .serif))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .padding(.horizontal, 6)
+                    .frame(width: 66, height: 58)
+                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.06), lineWidth: 0.5))
+            }
+        }
+        .accessibilityLabel(shown)
     }
 }
 
