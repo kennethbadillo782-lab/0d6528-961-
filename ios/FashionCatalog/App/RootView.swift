@@ -53,7 +53,11 @@ struct RootView: View {
             await CloudAccount.shared.restore()
             // Reintento periódico con cola persistente; también cubre cambios offline y de la API.
             while !Task.isCancelled {
-                if scenePhase == .active { await CatalogSync.shared.run(context: context) }
+                if scenePhase == .active {
+                    await CatalogSync.shared.run(context: context)
+                    // Productos guardados sin fotos: se buscan en su página y la próxima sincronización las sube.
+                    await PhotoBackfill.shared.run(context: context)
+                }
                 try? await Task.sleep(for: .seconds(8))
             }
         }

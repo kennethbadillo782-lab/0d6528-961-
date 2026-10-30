@@ -55,10 +55,12 @@ enum ImageService {
         return result
     }
 
-    static func download(_ url: URL, maxBytes: Int = 12_000_000) async -> Data? {
+    static func download(_ url: URL, referer: String? = nil, maxBytes: Int = 12_000_000) async -> Data? {
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.setValue(LinkImportService.userAgent, forHTTPHeaderField: "User-Agent")
-        if let host = url.host {
+        if let referer {
+            request.setValue(referer, forHTTPHeaderField: "Referer")
+        } else if let host = url.host {
             request.setValue("https://\(host)/", forHTTPHeaderField: "Referer")
         }
         guard let (data, response) = try? await NetworkSafety.data(for: request, maxBytes: maxBytes),

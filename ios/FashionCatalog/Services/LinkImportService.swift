@@ -130,13 +130,23 @@ enum LinkImportService {
 
     // MARK: Descarga y lectura
 
-    static func fetch(_ url: URL) async throws -> ImportedProductInfo {
+    private static func pageRequest(_ url: URL) -> URLRequest {
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
         request.setValue("es-ES,es;q=0.9,en;q=0.8,zh-CN;q=0.6", forHTTPHeaderField: "Accept-Language")
+        return request
+    }
 
-        let (data, response) = try await NetworkSafety.data(for: request, maxBytes: 3_000_000)
+    /// HTML de una página (primer 3 MB), o nil si no responde bien. Para buscar fotos en segundo plano.
+    static func html(_ url: URL) async -> String? {
+        guard let (data, response) = try? await NetworkSafety.data(for: pageRequest(url), maxBytes: 3_000_000),
+              let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return nil }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    static func fetch(_ url: URL) async throws -> ImportedProductInfo {
+        let (data, response) = try await NetworkSafety.data(for: pageRequest(url), maxBytes: 3_000_000)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw LinkImportError.httpStatus(http.statusCode)
         }
