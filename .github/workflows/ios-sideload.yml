@@ -6,6 +6,10 @@ on:
         description: Publicar en la fuente de SideStore (necesita el secreto UPDATES_TOKEN)
         type: boolean
         default: true
+      novedades:
+        description: Texto de "What's New" en SideStore
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -36,6 +40,7 @@ jobs:
         if: inputs.publicar
         env:
           GH_TOKEN: ${{ secrets.UPDATES_TOKEN }}
+          NOVEDADES: ${{ inputs.novedades }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
             echo "::warning::Falta el secreto UPDATES_TOKEN: la IPA se compiló pero no se publicó."

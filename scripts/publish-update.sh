@@ -13,6 +13,13 @@ tag="v$version"
 if ! gh release view "$tag" --repo "$public" >/dev/null 2>&1; then
   gh release create "$tag" build/MiCatalogo.ipa --repo "$public" --title "Mi Catálogo $version" --notes "Compilación $build" >/dev/null
 fi
+# Icono para SideStore: el repo privado no es legible, se copia una vez al público.
+icon='ios/FashionCatalog/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png'
+if ! gh api "repos/$public/contents/icon.png" >/dev/null 2>&1; then
+  python3 -c "import base64,json,sys;json.dump({'message':'Icono','content':base64.b64encode(open(sys.argv[1],'rb').read()).decode()},open('build/icon.json','w'))" "$icon"
+  gh api --method PUT "repos/$public/contents/icon.png" --input build/icon.json >/dev/null
+  rm -f build/icon.json
+fi
 # La primera vez no existe (404): se publica sin historial.
 gh api "repos/$public/contents/source.json" > build/current.json 2>/dev/null || echo '{}' > build/current.json
 python3 - "$public" "$tag" <<'PY'
@@ -22,6 +29,8 @@ src=json.load(open('build/source.json'))
 v=src['apps'][0]['versions'][0]
 v['downloadURL']=f'https://github.com/{public}/releases/download/{tag}/MiCatalogo.ipa'
 v['size']=os.path.getsize('build/MiCatalogo.ipa')
+v['localizedDescription']=os.environ.get('NOVEDADES') or f"Compilación {v['buildVersion']}"
+src['apps'][0]['iconURL']=f'https://raw.githubusercontent.com/{public}/main/icon.png'
 cur=json.load(open('build/current.json'))
 if cur.get('content'):
     old=json.loads(base64.b64decode(cur['content']).decode('utf-8'))
