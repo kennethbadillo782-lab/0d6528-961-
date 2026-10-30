@@ -178,7 +178,9 @@ final class CatalogSync: ObservableObject {
                 let dirty = entry?.pendingSince != nil
                 // Ya aplicada esa misma versión del servidor y sin cambios locales: nada que hacer.
                 // Antes se reaplicaban y guardaban todas las filas cada 8 s, y la app iba a tirones.
-                if !dirty, let stamp = r?["updated_at"] as? String, !stamp.isEmpty, entry?.remoteStamp == stamp { continue }
+                // Un borrado remoto nunca se salta, aunque llegue sin fecha nueva.
+                if !dirty, let r, let entry, let stamp = r["updated_at"] as? String, !stamp.isEmpty,
+                   entry.remoteStamp == stamp, entry.isDeleted == (r["deleted_at"] is String) { continue }
                 let remoteDate = CloudMapping.date(r?["updated_at"])
                 // El servidor gana cuando su fecha es posterior al cambio local pendiente.
                 let remoteWins = !dirty || (remoteDate != nil && entry?.pendingSince != nil && remoteDate! > entry!.pendingSince!)
