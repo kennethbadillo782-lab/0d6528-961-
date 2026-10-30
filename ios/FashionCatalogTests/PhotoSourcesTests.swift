@@ -89,6 +89,29 @@ final class PhotoSourcesTests: XCTestCase {
                        .photos([URL(string: "https://si.geilicdn.com/navy.jpg?w=1080&h=1080&cp=1")!]))
     }
 
+    func testModelNamedByChatGPTWins() {
+        // Dos Black Cat al mismo precio: sin ayuda hay que preguntar; con el modelo que guardó ChatGPT, no.
+        let gxmade = weidianPage(gallery: [], variants: [("2025 Black Cat（best-selling)", "cat25"), ("Black Cat 2020", "cat20"),
+                                                         ("SB Navy", "navy")],
+                                 prices: ["2025 Black Cat（best-selling)": 440, "Black Cat 2020": 440, "SB Navy": 440])
+        guard case .ambiguous = PhotoSources.weidianPhotos(html: gxmade, productName: "Jordan 4 Black Cat — GX Batch", price: 440) else {
+            return XCTFail("Sin el modelo indicado debe preguntar")
+        }
+        let cat25 = URL(string: "https://si.geilicdn.com/cat25.jpg?w=1080&h=1080&cp=1")!
+        XCTAssertEqual(PhotoSources.weidianPhotos(html: gxmade, productName: "Jordan 4 Black Cat", price: 440,
+                                                  listingModel: "2025 Black Cat（best-selling)"), .photos([cat25]))
+        // Escrito de otra forma también vale si solo un modelo lo contiene.
+        XCTAssertEqual(PhotoSources.weidianPhotos(html: gxmade, productName: "Jordan 4 Black Cat", price: 440,
+                                                  listingModel: "black cat 2025"), .photos([cat25]))
+        // Manda incluso si el precio guardado no cuadra.
+        XCTAssertEqual(PhotoSources.weidianPhotos(html: gxmade, productName: "Jordan 4 SB Navy", price: 999, listingModel: "SB Navy"),
+                       .photos([URL(string: "https://si.geilicdn.com/navy.jpg?w=1080&h=1080&cp=1")!]))
+        // Un modelo que no existe en el anuncio no inventa nada: vuelve a las reglas normales.
+        guard case .ambiguous = PhotoSources.weidianPhotos(html: gxmade, productName: "Jordan 4 Black Cat", price: 440, listingModel: "Cool Grey") else {
+            return XCTFail("Modelo inexistente: no debe elegir")
+        }
+    }
+
     func testUnknownModelInMultiModelListingStaysPending() {
         let html = weidianPage(gallery: ["cover"], variants: [("GX AJ4 Military Blue", "blue"), ("GX AJ4 Cool Grey", "grey")])
         guard case .ambiguous = PhotoSources.weidianPhotos(html: html, productName: "Air Jordan 4 Black Cat — GX Batch") else {

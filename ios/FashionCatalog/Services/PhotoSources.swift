@@ -108,10 +108,14 @@ enum PhotoSources {
     /// Fotos de Weidian del producto exacto. Si el anuncio agrupa varios modelos (cada uno con su foto),
     /// solo se acepta la foto del modelo cuyo nombre coincide con el del producto; si no hay coincidencia
     /// clara, no se elige ninguna para no mostrar otro modelo.
-    static func weidianPhotos(html: String, productName: String, price: Double? = nil) -> Extraction {
+    static func weidianPhotos(html: String, productName: String, price: Double? = nil, listingModel: String? = nil) -> Extraction {
         guard let data = weidianData(html: html) else { return .nothing }
         let distinctImages = Set(data.variants.map(\.image.absoluteString))
         if distinctImages.count >= 2 {
+            // ChatGPT indicó el modelo tal como lo escribe el anuncio: manda sobre nombre y precio.
+            if let listingModel, let chosen = variant(named: listingModel, in: data.variants) {
+                return .photos([chosen.image])
+            }
             let named = nameCandidates(for: productName, in: data.variants).list
             let choices = uniqueImages(named.isEmpty ? data.variants : named)
             guard let match = bestVariant(for: productName, price: price, in: data.variants) else {
@@ -183,6 +187,23 @@ enum PhotoSources {
             vt.contains(word) || (nicknames[word].map { $0.isSubset(of: vt) } ?? false)
         }
         return (variants.filter { v in let vt = Set(tokens(v.name)); return strong.allSatisfy { matches($0, vt) } }, extras)
+    }
+
+    /// Modelo del anuncio con ese nombre: primero idéntico (sin mayúsculas ni signos); si no, el único
+    /// que contiene todas sus palabras. Nada si hay más de una foto posible.
+    static func variant(named model: String, in variants: [Variant]) -> Variant? {
+        func plain(_ s: String) -> String {
+            s.lowercased().folding(options: .diacriticInsensitive, locale: nil).unicodeScalars
+                .filter(CharacterSet.alphanumerics.contains).map(String.init).joined()
+        }
+        let target = plain(model)
+        guard !target.isEmpty else { return nil }
+        let exact = variants.filter { plain($0.name) == target }
+        if Set(exact.map(\.image)).count == 1 { return exact.first }
+        let words = Set(tokens(model))
+        guard !words.isEmpty else { return nil }
+        let containing = variants.filter { words.isSubset(of: Set(tokens($0.name))) }
+        return Set(containing.map(\.image)).count == 1 ? containing.first : nil
     }
 
     static func uniqueImages(_ variants: [Variant]) -> [Variant] {

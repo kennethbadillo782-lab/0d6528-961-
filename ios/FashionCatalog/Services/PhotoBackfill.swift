@@ -137,7 +137,8 @@ final class PhotoBackfill: ObservableObject {
         var reasons: [String] = []
         var choices: [Choice] = []
         for page in pages {
-            let (candidates, reason, options) = await candidates(page: page, productName: product.name, price: product.priceCurrent)
+            let (candidates, reason, options) = await candidates(page: page, productName: product.name, price: product.priceCurrent,
+                                                                  listingModel: listingModel(of: product))
             if let reason { reasons.append(reason) }
             if choices.isEmpty { choices = options }
             guard !candidates.isEmpty else { continue }
@@ -152,7 +153,14 @@ final class PhotoBackfill: ObservableObject {
     }
 
     /// Fotos candidatas del producto exacto en una página y, si no hay, el motivo.
-    static func candidates(page: URL, productName: String, price: Double?) async -> ([URL], String?, [Choice]) {
+    /// Modelo exacto del anuncio que guardó ChatGPT (attributes.modelo_anuncio), si lo hay.
+    static func listingModel(of product: Product) -> String? {
+        let keys = ["modelo_anuncio", "modelo", "variante", "variant", "model", "sku"]
+        let attrs = product.attributes
+        return keys.lazy.compactMap { key in attrs.first { $0.key.lowercased() == key }?.value.trimmed }.first { !$0.isEmpty }
+    }
+
+    static func candidates(page: URL, productName: String, price: Double?, listingModel: String? = nil) async -> ([URL], String?, [Choice]) {
         let store = PhotoSources.store(of: page)
         switch store {
         case .weidian:
@@ -160,7 +168,7 @@ final class PhotoBackfill: ObservableObject {
                     .first(where: { $0.name.lowercased() == "itemid" })?.value,
                   let fixed = PhotoSources.itemURL(platform: "weidian", id: item) else { break }
             guard let html = await LinkImportService.html(fixed) else { return ([], "Weidian no respondió.", []) }
-            switch PhotoSources.weidianPhotos(html: html, productName: productName, price: price) {
+            switch PhotoSources.weidianPhotos(html: html, productName: productName, price: price, listingModel: listingModel) {
             case .photos(let urls): return (urls, nil, [])
             case .ambiguous(let why, let options):
                 return ([], why, options.map { Choice(name: $0.name, image: $0.image, price: $0.price) })
