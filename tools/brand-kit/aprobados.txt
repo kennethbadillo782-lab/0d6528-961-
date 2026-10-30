@@ -1,0 +1,3 @@
+# Logos revisados a ojo en revision.png que sí son de la marca de moda.
+# Uno por línea (id de marcas.json). Lo que no esté aquí no entra en la app.
+old-navy
