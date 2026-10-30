@@ -8,7 +8,8 @@ enum PhotoSources {
     /// Resultado de leer una página: fotos del producto exacto, o el motivo por el que no se pudo.
     enum Extraction: Equatable {
         case photos([URL])
-        case ambiguous(String)
+        /// No se puede decidir solo: motivo y modelos candidatos para que el usuario elija con un toque.
+        case ambiguous(String, [Variant])
         case nothing
     }
 
@@ -111,8 +112,18 @@ enum PhotoSources {
         guard let data = weidianData(html: html) else { return .nothing }
         let distinctImages = Set(data.variants.map(\.image.absoluteString))
         if distinctImages.count >= 2 {
+            let named = nameCandidates(for: productName, in: data.variants).list
+            let choices = uniqueImages(named.isEmpty ? data.variants : named)
             guard let match = bestVariant(for: productName, price: price, in: data.variants) else {
-                return .ambiguous("El anuncio tiene varios modelos y ninguno coincide claramente con el nombre del producto.")
+                return .ambiguous(named.isEmpty
+                    ? "El anuncio tiene varios modelos y ninguno coincide con el nombre del producto."
+                    : "Hay varios modelos que encajan con el nombre y el precio. Elige el tuyo.", choices)
+            }
+            // El precio también debe cuadrar (o ser el «desde» del anuncio): si no, puede ser otro modelo.
+            let lowest = data.variants.compactMap(\.price).min()
+            if let price, let own = match.price, abs(own - price) >= 0.5, lowest.map({ abs($0 - price) >= 0.5 }) ?? true {
+                return .ambiguous("«\(match.name)» cuesta ¥\(Int(own)) y el producto ¥\(Int(price)). Confirma cuál es.",
+                                  uniqueImages([match] + choices))
             }
             return .photos([match.image])
         }
@@ -142,17 +153,9 @@ enum PhotoSources {
     /// Modelo del anuncio que corresponde al producto: todas sus palabras distintivas deben aparecer
     /// (o su apodo, como Bred). Si varios cumplen, desempatan el precio y luego el año o la colaboración.
     static func bestVariant(for productName: String, price: Double?, in variants: [Variant]) -> Variant? {
-        // Lo que va tras "—" suele ser el lote o el vendedor ("GX Batch"), no el modelo.
-        let base = productName.components(separatedBy: CharacterSet(charactersIn: "—–|")).first ?? productName
-        let all = tokens(base)
-        let isYear = { (t: String) in t.count == 4 && t.hasPrefix("20") && t.allSatisfy(\.isNumber) }
-        let strong = Set(all.filter { !isYear($0) && !weakWords.contains($0) })
-        let extras = Set(all.filter { isYear($0) || weakWords.contains($0) })
-        guard !strong.isEmpty else { return nil }
-        func matches(_ word: String, _ vt: Set<String>) -> Bool {
-            vt.contains(word) || (nicknames[word].map { $0.isSubset(of: vt) } ?? false)
-        }
-        var candidates = variants.filter { v in let vt = Set(tokens(v.name)); return strong.allSatisfy { matches($0, vt) } }
+        let named = nameCandidates(for: productName, in: variants)
+        var candidates = named.list
+        let extras = named.extras
         func decided() -> Variant? { Set(candidates.map(\.image)).count == 1 ? candidates.first : nil }
         if candidates.isEmpty { return nil }
         if let one = decided() { return one }
@@ -164,6 +167,27 @@ enum PhotoSources {
         let scored = candidates.map { v in (v, extras.intersection(Set(tokens(v.name))).count) }.sorted { $0.1 > $1.1 }
         guard let top = scored.first, top.1 > 0, !scored.dropFirst().contains(where: { $0.1 == top.1 && $0.0.image != top.0.image }) else { return nil }
         return top.0
+    }
+
+    /// Modelos cuyo nombre contiene todas las palabras distintivas del producto (o su apodo, como Bred),
+    /// y las palabras de desempate (año, colaboración).
+    static func nameCandidates(for productName: String, in variants: [Variant]) -> (list: [Variant], extras: Set<String>) {
+        // Lo que va tras "—" suele ser el lote o el vendedor ("GX Batch"), no el modelo.
+        let base = productName.components(separatedBy: CharacterSet(charactersIn: "—–|")).first ?? productName
+        let all = tokens(base)
+        let isYear = { (t: String) in t.count == 4 && t.hasPrefix("20") && t.allSatisfy(\.isNumber) }
+        let strong = Set(all.filter { !isYear($0) && !weakWords.contains($0) })
+        let extras = Set(all.filter { isYear($0) || weakWords.contains($0) })
+        guard !strong.isEmpty else { return ([], extras) }
+        func matches(_ word: String, _ vt: Set<String>) -> Bool {
+            vt.contains(word) || (nicknames[word].map { $0.isSubset(of: vt) } ?? false)
+        }
+        return (variants.filter { v in let vt = Set(tokens(v.name)); return strong.allSatisfy { matches($0, vt) } }, extras)
+    }
+
+    static func uniqueImages(_ variants: [Variant]) -> [Variant] {
+        var seen = Set<URL>()
+        return Array(variants.filter { seen.insert($0.image).inserted }.prefix(40))
     }
 
     // MARK: Yupoo

@@ -174,6 +174,28 @@ struct ProductDetailView: View {
                 Text("Wearlist las buscará en la página de la tienda en unos segundos.")
                     .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
             }
+            if let choices = state?.choices, !choices.isEmpty, state?.working != true {
+                Text("¿Cuál es tu modelo?").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(choices) { choice in
+                            Button { Task { await backfill.choose(choice, for: product, context: context) } } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    AsyncImage(url: choice.image) { $0.resizable().scaledToFill() } placeholder: { Theme.background }
+                                        .frame(width: 96, height: 96)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    Text(choice.name).font(.system(size: 11)).foregroundStyle(.white).lineLimit(2)
+                                    if let price = choice.price {
+                                        Text(Money.format(price, code: "CNY")).font(.system(size: 11)).foregroundStyle(Theme.textSecondary)
+                                    }
+                                }
+                                .frame(width: 96, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
             HStack(spacing: 10) {
                 Button("Reintentar") { Task { await backfill.retryNow(product, context: context) } }
                     .disabled(state?.working == true)

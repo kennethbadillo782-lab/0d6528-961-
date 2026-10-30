@@ -21,11 +21,16 @@ final class PhotoSourcesTests: XCTestCase {
     }
 
     /// Página de Weidian con el formato real: JSON dentro de data-obj con entidades HTML.
-    private func weidianPage(gallery: [String], variants: [(String, String)]) -> String {
-        let values = variants.map { ["attr_value": $0.0, "img": "https://si.geilicdn.com/\($0.1).jpg"] }
+    private func weidianPage(gallery: [String], variants: [(String, String)], prices: [String: Double] = [:]) -> String {
+        let values = variants.enumerated().map { i, v in ["attr_id": 100 + i, "attr_value": v.0, "img": "https://si.geilicdn.com/\(v.1).jpg"] as [String: Any] }
+        // Combinaciones modelo-talla con su precio, como en la página real ("attr_ids": "100-7").
+        var skus: [String: Any] = [:]
+        for (i, v) in variants.enumerated() {
+            if let price = prices[v.0] { skus["\(i)"] = ["attr_ids": "\(100 + i)-7", "price": String(format: "%.2f", price)] }
+        }
         let obj: [String: Any] = ["result": ["default_model": [
             "item_info": ["imgs": gallery.map { "https://si.geilicdn.com/\($0).jpg" }, "item_name": "GX Batch 4"],
-            "sku_properties": ["attr_list": [["attr_title": "COLORS", "attr_values": values]]],
+            "sku_properties": ["attr_list": [["attr_title": "COLORS", "attr_values": values]], "sku": skus],
         ]]]
         let json = String(data: try! JSONSerialization.data(withJSONObject: obj), encoding: .utf8)!
         let encoded = json.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "\"", with: "&#34;")
@@ -66,6 +71,22 @@ final class PhotoSourcesTests: XCTestCase {
                       PhotoSources.Variant(name: "SB Pine Green", image: URL(string: "https://a/pine.jpg")!)]
         XCTAssertEqual(PhotoSources.bestVariant(for: "Air Jordan 4 SB Navy — GX Batch", price: nil, in: navies)?.name, "SB Navy")
         XCTAssertNil(PhotoSources.bestVariant(for: "Jordan 4 SB", price: nil, in: navies))
+    }
+
+    func testPriceMismatchAsksInsteadOfGuessing() {
+        // Caso real de TMF: "Navy Blue" cuesta ¥500 y el producto se guardó a ¥450.
+        let tmf = weidianPage(gallery: ["cover"], variants: [("GX AJ4 Navy Blue", "navy"), ("GX AJ4 Black Cat 2025", "cat")],
+                              prices: ["GX AJ4 Navy Blue": 500, "GX AJ4 Black Cat 2025": 420])
+        guard case .ambiguous(_, let choices) = PhotoSources.weidianPhotos(html: tmf, productName: "Jordan 4 SB Navy — GX Batch", price: 450) else {
+            return XCTFail("Un modelo con otro precio no se pone sin confirmar")
+        }
+        XCTAssertEqual(choices.first?.name, "GX AJ4 Navy Blue")
+        XCTAssertEqual(choices.first?.price, 500)
+        // Con el precio correcto, o con el precio «desde» del anuncio, sí se pone.
+        XCTAssertEqual(PhotoSources.weidianPhotos(html: tmf, productName: "Jordan 4 SB Navy", price: 500),
+                       .photos([URL(string: "https://si.geilicdn.com/navy.jpg?w=1080&h=1080&cp=1")!]))
+        XCTAssertEqual(PhotoSources.weidianPhotos(html: tmf, productName: "Jordan 4 SB Navy", price: 420),
+                       .photos([URL(string: "https://si.geilicdn.com/navy.jpg?w=1080&h=1080&cp=1")!]))
     }
 
     func testUnknownModelInMultiModelListingStaysPending() {
