@@ -1,0 +1,30 @@
+name: Brand logos (descarga del kit)
+on:
+  push:
+    branches: [claude/oye-nui2ws]
+    paths: [tools/brand-kit/descargar_logos.py, tools/brand-kit/importar_a_app.py, .github/workflows/brand-logos.yml]
+permissions:
+  contents: write
+concurrency:
+  group: brand-logos
+  cancel-in-progress: true
+jobs:
+  logos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Install converters
+        run: python3 -m pip install --quiet cairosvg pillow
+      - name: Download logos with the kit script
+        working-directory: tools/brand-kit
+        run: python3 descargar_logos.py --sin-png --trabajadores 6
+      - name: Import into the iOS app
+        run: python3 tools/brand-kit/importar_a_app.py
+      - name: Commit results to this branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/brand-kit ios/FashionCatalog/Resources
+          git commit -m "Import brand logos downloaded by the brand kit" || { echo "Sin cambios"; exit 0; }
+          git push origin HEAD:claude/oye-nui2ws
