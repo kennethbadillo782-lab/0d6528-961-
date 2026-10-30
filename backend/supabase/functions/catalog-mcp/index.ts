@@ -178,7 +178,10 @@ async function authorizeCallback(url: URL) {
   const reqToken = url.searchParams.get("req") ?? "";
   const p = await verify(reqToken, "areq");
   const code = url.searchParams.get("code") ?? "";
-  if (!p || !/^[A-Za-z0-9-]{8,128}$/.test(code)) return text(400, "Enlace no válido o caducado. Vuelve a ChatGPT y conecta otra vez.");
+  // Supabase Auth devuelve aquí sus propios errores (enlace usado, anulado por uno más nuevo, vencido).
+  const authError = (url.searchParams.get("error_description") ?? url.searchParams.get("error_code") ?? "").slice(0, 200).replace(/[^\p{L}\p{N} .,:_-]/gu, "");
+  if (!p) return text(400, "La solicitud de ChatGPT caducó (15 minutos). Vuelve a ChatGPT y pulsa Conectar una sola vez.");
+  if (!/^[A-Za-z0-9-]{8,128}$/.test(code)) return text(400, "Enlace no válido o caducado" + (authError ? ` (Supabase: ${authError})` : "") + ".\nUsa solo el ÚLTIMO correo: cada vez que pulsas Conectar se anula el enlace anterior.\nVuelve a ChatGPT, pulsa Conectar una vez y espera ese correo.");
   const r = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=pkce", { method: "POST", headers: { apikey: ANON_KEY, "content-type": "application/json" },
     body: JSON.stringify({ auth_code: code, code_verifier: await authVerifier(String(p.n)) }) });
   const session = r.ok ? await r.json().catch(() => null) : null;
