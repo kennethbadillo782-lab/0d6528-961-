@@ -138,13 +138,19 @@ final class PhotoBackfill: ObservableObject {
         var choices: [Choice] = []
         for page in pages {
             let (candidates, reason, options) = await candidates(page: page, productName: product.name, price: product.priceCurrent,
-                                                                  listingModel: listingModel(of: product))
+                                                                  listingHints: listingHints(of: product))
             if let reason { reasons.append(reason) }
             if choices.isEmpty { choices = options }
             guard !candidates.isEmpty else { continue }
-            var result: [(url: URL, data: Data)] = []
-            for url in candidates.prefix(9) {
-                if let data = await ImageService.download(url, referer: referer(page: page, image: url)) { result.append((url, data)) }
+            // Todas a la vez: antes, una tras otra, tardaba mucho en "Buscando fotos…".
+            let result: [(url: URL, data: Data)] = await withTaskGroup(of: (Int, URL, Data?).self) { group in
+                for (i, url) in candidates.prefix(9).enumerated() {
+                    let ref = referer(page: page, image: url)
+                    group.addTask { (i, url, await ImageService.download(url, referer: ref)) }
+                }
+                var got: [(Int, URL, Data)] = []
+                for await (i, url, data) in group { if let data { got.append((i, url, data)) } }
+                return got.sorted { $0.0 < $1.0 }.map { (url: $0.1, data: $0.2) }
             }
             if !result.isEmpty { return .found(result) }
             reasons.append("La tienda no dejó descargar las fotos.")
@@ -154,13 +160,19 @@ final class PhotoBackfill: ObservableObject {
 
     /// Fotos candidatas del producto exacto en una página y, si no hay, el motivo.
     /// Modelo exacto del anuncio que guardó ChatGPT (attributes.modelo_anuncio), si lo hay.
-    static func listingModel(of product: Product) -> String? {
-        let keys = ["modelo_anuncio", "modelo", "variante", "variant", "model", "sku"]
-        let attrs = product.attributes
-        return keys.lazy.compactMap { key in attrs.first { $0.key.lowercased() == key }?.value.trimmed }.first { !$0.isEmpty }
+    /// Pistas del modelo exacto que guardó ChatGPT en attributes, sea cual sea el nombre del campo
+    /// (modelo_anuncio, variante_exacta_anuncio, sku…): primero la variante, luego el modelo.
+    static func listingHints(of product: Product) -> [String] {
+        let attrs = product.attributes.sorted { $0.key < $1.key }
+        func values(_ words: [String]) -> [String] {
+            attrs.filter { a in words.contains { a.key.lowercased().contains($0) } }.map(\.value)
+        }
+        var seen = Set<String>()
+        return (values(["variant", "sku"]) + values(["modelo", "model"]))
+            .flatMap(PhotoSources.hints(from:)).filter { seen.insert($0).inserted }
     }
 
-    static func candidates(page: URL, productName: String, price: Double?, listingModel: String? = nil) async -> ([URL], String?, [Choice]) {
+    static func candidates(page: URL, productName: String, price: Double?, listingHints: [String] = []) async -> ([URL], String?, [Choice]) {
         let store = PhotoSources.store(of: page)
         switch store {
         case .weidian:
@@ -170,7 +182,7 @@ final class PhotoBackfill: ObservableObject {
             guard let html = await LinkImportService.html(fixed) else { return ([], "Weidian no respondió.", []) }
             // El análisis (JSON de cientos de combinaciones) fuera del hilo principal: la app no se traba.
             let extraction = await Task.detached(priority: .utility) {
-                PhotoSources.weidianPhotos(html: html, productName: productName, price: price, listingModel: listingModel)
+                PhotoSources.weidianPhotos(html: html, productName: productName, price: price, listingHints: listingHints)
             }.value
             switch extraction {
             case .photos(let urls): return (urls, nil, [])

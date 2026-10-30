@@ -108,13 +108,14 @@ enum PhotoSources {
     /// Fotos de Weidian del producto exacto. Si el anuncio agrupa varios modelos (cada uno con su foto),
     /// solo se acepta la foto del modelo cuyo nombre coincide con el del producto; si no hay coincidencia
     /// clara, no se elige ninguna para no mostrar otro modelo.
-    static func weidianPhotos(html: String, productName: String, price: Double? = nil, listingModel: String? = nil) -> Extraction {
+    static func weidianPhotos(html: String, productName: String, price: Double? = nil, listingModel: String? = nil,
+                              listingHints: [String] = []) -> Extraction {
         guard let data = weidianData(html: html) else { return .nothing }
         let distinctImages = Set(data.variants.map(\.image.absoluteString))
         if distinctImages.count >= 2 {
             // ChatGPT indicó el modelo tal como lo escribe el anuncio: manda sobre nombre y precio.
-            if let listingModel, let chosen = variant(named: listingModel, in: data.variants) {
-                return .photos([chosen.image])
+            for hint in (listingModel.map { [$0] } ?? []) + listingHints {
+                if let chosen = variant(named: hint, in: data.variants) { return .photos([chosen.image]) }
             }
             let named = nameCandidates(for: productName, in: data.variants).list
             let choices = uniqueImages(named.isEmpty ? data.variants : named)
@@ -204,6 +205,15 @@ enum PhotoSources {
         guard !words.isEmpty else { return nil }
         let containing = variants.filter { words.isSubset(of: Set(tokens($0.name))) }
         return Set(containing.map(\.image)).count == 1 ? containing.first : nil
+    }
+
+    /// Formas de un valor como "Negra — 黑色" o "Negro lavado / 洗水黑": entero y cada parte por separado,
+    /// porque el anuncio suele nombrar el modelo solo en uno de los idiomas.
+    static func hints(from value: String) -> [String] {
+        let parts = value.components(separatedBy: CharacterSet(charactersIn: "—–|/;,，、()（）"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        var seen = Set<String>()
+        return ([value.trimmingCharacters(in: .whitespacesAndNewlines)] + parts).filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 
     static func uniqueImages(_ variants: [Variant]) -> [Variant] {

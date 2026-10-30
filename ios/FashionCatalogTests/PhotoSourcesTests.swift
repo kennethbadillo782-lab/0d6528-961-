@@ -112,6 +112,18 @@ final class PhotoSourcesTests: XCTestCase {
         }
     }
 
+    func testBilingualVariantFromChatGPT() {
+        // Caso real: ChatGPT envió "Negra — 黑色" y el anuncio llama a los colores solo en chino.
+        let polo = weidianPage(gallery: ["cover"], variants: [("黑色", "black"), ("白色", "white"), ("洗水黑", "washed")])
+        XCTAssertEqual(PhotoSources.hints(from: "Negra — 黑色"), ["Negra — 黑色", "Negra", "黑色"])
+        XCTAssertEqual(PhotoSources.weidianPhotos(html: polo, productName: "Gucci 2026 New Polo Shirt — Black", price: 125,
+                                                  listingHints: PhotoSources.hints(from: "Negra — 黑色")),
+                       .photos([URL(string: "https://si.geilicdn.com/black.jpg?w=1080&h=1080&cp=1")!]))
+        XCTAssertEqual(PhotoSources.weidianPhotos(html: polo, productName: "Gallery Dept ATK", price: 110,
+                                                  listingHints: PhotoSources.hints(from: "Negro lavado — 洗水黑")),
+                       .photos([URL(string: "https://si.geilicdn.com/washed.jpg?w=1080&h=1080&cp=1")!]))
+    }
+
     func testUnknownModelInMultiModelListingStaysPending() {
         let html = weidianPage(gallery: ["cover"], variants: [("GX AJ4 Military Blue", "blue"), ("GX AJ4 Cool Grey", "grey")])
         guard case .ambiguous = PhotoSources.weidianPhotos(html: html, productName: "Air Jordan 4 Black Cat — GX Batch") else {
