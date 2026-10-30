@@ -10,12 +10,54 @@ on:
         description: Texto de "What's New" en SideStore
         type: string
         default: ''
+      pruebas:
+        description: Ejecutar las pruebas unitarias antes de publicar
+        type: boolean
+        default: true
 permissions:
   contents: read
 concurrency:
   group: ios-sideload
   cancel-in-progress: false
+# Pruebas y compilación corren a la vez en dos Mac; solo se publica si ambas terminan bien.
 jobs:
+  test:
+    if: inputs.pruebas
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: build/TestDerivedData/SourcePackages
+          key: spm-test-${{ hashFiles('ios/project.yml') }}
+      - name: Install XcodeGen
+        run: command -v xcodegen || brew install xcodegen
+      - name: Unit tests
+        run: |
+          python3 scripts/configure-cloud.py
+          (cd ios && xcodegen generate)
+          udid=$(xcrun simctl list devices available -j | python3 -c 'import sys,json; ds=[d for v in json.load(sys.stdin)["devices"].values() for d in v if "iPhone" in d["name"]]; print(ds[0]["udid"])')
+          mkdir -p reports
+          set -o pipefail
+          # Las pruebas contra el servidor real (CloudLiveTests) necesitan secretos y van en "iOS Simulator".
+          xcodebuild -project ios/MiCatalogo.xcodeproj -scheme MiCatalogo -configuration Debug \
+            -destination "platform=iOS Simulator,id=$udid" -derivedDataPath build/TestDerivedData \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= \
+            -only-testing:MiCatalogoTests -skip-testing:MiCatalogoTests/CloudLiveTests test 2>&1 \
+            | tee reports/ios-unit-tests.log | grep -E "error:|Test Case .* failed|Executed" || true
+          grep -q "TEST SUCCEEDED" reports/ios-unit-tests.log
+      - name: Save test log
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: MiCatalogo-tests-${{ github.run_number }}
+          retention-days: 7
+          path: reports/ios-unit-tests.log
+
   build:
     runs-on: macos-26
     timeout-minutes: 20
@@ -23,6 +65,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: build/DeviceDerivedData/SourcePackages
+          key: spm-device-${{ hashFiles('ios/project.yml') }}
       - name: Install XcodeGen
         run: command -v xcodegen || brew install xcodegen
       - name: Build unsigned device IPA
@@ -36,8 +83,20 @@ jobs:
             build/MiCatalogo.ipa
             build/source.json
             reports/ios-sideload-build.log
+
+  publish:
+    needs: [test, build]
+    if: always() && inputs.publicar && needs.build.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: MiCatalogo-ipa-${{ github.run_number }}
       - name: Publish to SideStore source
-        if: inputs.publicar
         env:
           GH_TOKEN: ${{ secrets.UPDATES_TOKEN }}
           NOVEDADES: ${{ inputs.novedades }}
