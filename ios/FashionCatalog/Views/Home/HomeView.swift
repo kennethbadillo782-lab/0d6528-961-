@@ -261,13 +261,7 @@ struct HomeView: View {
 struct BrandTile: View {
     let name: String
 
-    /// Iniciales en texto neutro: no se reproducen logotipos de las marcas.
-    private var initials: String {
-        let words = name.split(separator: " ").prefix(2)
-        return words.compactMap { $0.first.map(String.init) }.joined().uppercased()
-    }
-
-    /// Logo verificado sobre fondo claro (sin recolorear) o, si no hay, el nombre en serif.
+    /// Todas las marcas en la misma tarjeta clara: el logo verificado o, si no hay, su nombre como logotipo.
     var body: some View {
         let shown = BrandLibrary.displayName(name)
         Group {
@@ -276,20 +270,19 @@ struct BrandTile: View {
                     .resizable()
                     .scaledToFit()
                     .padding(10)
-                    .frame(width: 66, height: 58)
-                    .background(Color(hex: 0xF2F2F2), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             } else {
-                Text(shown.count <= 6 ? shown : initials)
-                    .font(.system(size: shown.count <= 6 ? 17 : 22, weight: .semibold, design: .serif))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                Text(shown.uppercased())
+                    .font(.system(size: 15, weight: .heavy))
+                    .tracking(-0.3)
+                    .foregroundStyle(Color(hex: 0x111111))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(shown.contains(" ") ? 2 : 1)
+                    .minimumScaleFactor(0.45)
                     .padding(.horizontal, 6)
-                    .frame(width: 66, height: 58)
-                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.06), lineWidth: 0.5))
             }
         }
+        .frame(width: 66, height: 58)
+        .background(Color(hex: 0xF2F2F2), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .accessibilityLabel(shown)
     }
 }
