@@ -130,9 +130,10 @@ final class CatalogSync: ObservableObject {
                 // Ya subida: no se vuelve a leer del disco (las fotos no se editan, solo se añaden o borran).
                 if !image.cloudPath.isEmpty && !image.cloudUploadedHash.isEmpty { continue }
                 guard let data = image.data else { continue }
-                let hash = SHA256.hash(data:data).map { String(format:"%02x",$0) }.joined()
+                let hash = await Task.detached(priority: .utility) { Self.sha(data) }.value
                 if image.cloudUploadedHash == hash && !image.cloudPath.isEmpty { continue }
-                guard let jpeg = ImageService.downsample(data,maxPixel:1600)?.jpegData(compressionQuality:0.78), jpeg.count <= 5_000_000 else { throw CloudError.invalidData }
+                // Fuera del hilo de la pantalla: con 9 fotos nuevas la app se congelaba más de un segundo.
+                guard let jpeg = await Self.recompress(data, quality: 0.78), jpeg.count <= 5_000_000 else { continue }
                 let path = "\(owner)/\(p.id.uuidString.lowercased())/\(UUID().uuidString.lowercased()).jpg"
                 try await transport.upload(jpeg,path:path)
                 // Si se editó mientras subía, la nueva imagen quedará pendiente en el siguiente ciclo.
@@ -143,7 +144,7 @@ final class CatalogSync: ObservableObject {
             if let data = collection.coverData {
                 let hash = SHA256.hash(data:data).map { String(format:"%02x",$0) }.joined()
                 if collection.cloudCoverHash != hash || collection.cloudCoverPath == nil {
-                    guard let jpeg = ImageService.downsample(data,maxPixel:1600)?.jpegData(compressionQuality:0.78) else { throw CloudError.invalidData }
+                    guard let jpeg = await Self.recompress(data, quality: 0.78) else { continue }
                     let path = "\(owner)/\(collection.id.uuidString.lowercased())/\(UUID().uuidString.lowercased()).jpg"
                     try await transport.upload(jpeg,path:path)
                     if collection.coverData == data { collection.cloudCoverPath = path; collection.cloudCoverHash = hash }
@@ -212,17 +213,18 @@ final class CatalogSync: ObservableObject {
             }
         }
         // Fotos privadas: ninguna URL firmada persistida ni token en los modelos.
+        // Antes, una sola foto que fallaba cortaba la sincronización entera y las demás no llegaban nunca.
         for image in try context.fetch(FetchDescriptor<ProductImage>()) where image.data == nil && !image.cloudPath.isEmpty {
             let path = image.cloudPath
-            let data = try await transport.download(path)
-            guard let decoded = ImageService.downsample(data,maxPixel:1600), let jpeg = decoded.jpegData(compressionQuality:0.85) else { throw CloudError.invalidData }
-            if image.cloudPath == path { image.data = jpeg; image.cloudUploadedHash = SHA256.hash(data:jpeg).map { String(format:"%02x",$0) }.joined() }
+            guard let data = try? await transport.download(path), let jpeg = await Self.recompress(data, quality: 0.85) else { continue }
+            let hash = await Task.detached(priority: .utility) { Self.sha(jpeg) }.value
+            if image.cloudPath == path { image.data = jpeg; image.cloudUploadedHash = hash; try? context.save() }
         }
         for collection in try context.fetch(FetchDescriptor<ProductCollection>()) where collection.coverData == nil {
             if let path = collection.cloudCoverPath {
-                let data = try await transport.download(path)
-                guard let decoded = ImageService.downsample(data,maxPixel:1600), let jpeg = decoded.jpegData(compressionQuality:0.85) else { throw CloudError.invalidData }
-                if collection.cloudCoverPath == path { collection.coverData = jpeg; collection.cloudCoverHash = SHA256.hash(data:jpeg).map { String(format:"%02x",$0) }.joined() }
+                guard let data = try? await transport.download(path), let jpeg = await Self.recompress(data, quality: 0.85) else { continue }
+                let hash = await Task.detached(priority: .utility) { Self.sha(jpeg) }.value
+                if collection.cloudCoverPath == path { collection.coverData = jpeg; collection.cloudCoverHash = hash }
             }
         }
         // La descarga de caché no es una modificación de la foto del usuario.
@@ -232,6 +234,13 @@ final class CatalogSync: ObservableObject {
         }
         try context.save(); lastSync = Date(); status = "Sincronizado"
     }
+    /// Reduce a 1600 px y recomprime en segundo plano (el trabajo pesado nunca en el hilo de la pantalla).
+    nonisolated static func recompress(_ data: Data, quality: CGFloat) async -> Data? {
+        await Task.detached(priority: .utility) {
+            ImageService.downsample(data, maxPixel: 1600)?.jpegData(compressionQuality: quality)
+        }.value
+    }
+    nonisolated static func sha(_ data: Data) -> String { SHA256.hash(data:data).map { String(format:"%02x",$0) }.joined() }
     func capturePending(context: ModelContext, owner: String) throws {
         let snapshots = try CloudMapping.snapshots(context)
         var entries = try context.fetch(FetchDescriptor<CloudSyncEntry>()).filter { $0.owner == owner }

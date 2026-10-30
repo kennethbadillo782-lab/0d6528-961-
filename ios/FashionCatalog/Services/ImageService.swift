@@ -102,7 +102,8 @@ struct CatalogImage: View {
     var body: some View {
         if let image {
             ImageLoaderView(
-                cacheKey: "\(image.id.uuidString)-\(Int(maxPixel))",
+                // Incluye la huella: cuando la foto llega de la nube cambia y la vista la recarga sola.
+                cacheKey: "\(image.id.uuidString)-\(Int(maxPixel))-\(image.cloudUploadedHash.prefix(12))",
                 dataProvider: { image.data },
                 remoteURL: image.remoteURL,
                 maxPixel: maxPixel,

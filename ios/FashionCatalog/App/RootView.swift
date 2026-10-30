@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct RootView: View {
     @EnvironmentObject var appState: AppState
@@ -56,17 +57,23 @@ struct RootView: View {
             await CloudAccount.shared.restore()
             // Reintento periódico con cola persistente; también cubre cambios offline y de la API.
             while !Task.isCancelled {
-                if scenePhase == .active {
+                // Estado real en cada vuelta: scenePhase dentro de .task es el del arranque y no cambia.
+                if UIApplication.shared.applicationState == .active {
                     await CatalogSync.shared.run(context: context)
                     // Productos guardados sin fotos: se buscan en su página y la próxima sincronización las sube.
                     await PhotoBackfill.shared.run(context: context)
                 }
-                // Cada 20 s basta: al volver a la app ya se sincroniza al instante (onChange de abajo).
-                try? await Task.sleep(for: .seconds(20))
+                // Cada 10 s: si no hay cambios en la nube la sincronización apenas hace trabajo.
+                try? await Task.sleep(for: .seconds(10))
             }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await CatalogSync.shared.run(context:context) } }
+            if phase == .active {
+                Task {
+                    await CatalogSync.shared.run(context:context)
+                    await PhotoBackfill.shared.run(context: context)
+                }
+            }
         }
         .onOpenURL { url in
             Task { await CloudAccount.shared.acceptLink(url.absoluteString); await CatalogSync.shared.run(context:context) }
