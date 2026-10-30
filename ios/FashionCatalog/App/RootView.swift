@@ -16,6 +16,10 @@ struct RootView: View {
                 .tabItem { Label("Explorar", systemImage: "magnifyingglass") }
                 .tag(AppTab.explore)
 
+            Color.clear
+                .tabItem { Label("Agregar", systemImage: "plus.app.fill") }
+                .tag(AppTab.add)
+
             NavigationStack { SavedView().withAppRoutes() }
                 .tabItem { Label("Guardados", systemImage: "bookmark") }
                 .tag(AppTab.saved)
@@ -23,12 +27,15 @@ struct RootView: View {
             NavigationStack { CollectionsView().withAppRoutes() }
                 .tabItem { Label("Colecciones", systemImage: "folder") }
                 .tag(AppTab.collections)
-
-            NavigationStack { AccountView().withAppRoutes() }
-                .tabItem { Label("Cuenta", systemImage: "person") }
-                .tag(AppTab.account)
         }
-        .tint(Theme.blue)
+        .tint(Theme.accent)
+        .onChange(of: appState.selectedTab) { old, new in
+            // El botón central abre "agregar" sin cambiar de pestaña.
+            if new == .add {
+                appState.selectedTab = old
+                appState.presentAdd()
+            }
+        }
         .sheet(item: $appState.addRequest) { request in
             AddProductView(request: request)
         }

@@ -12,6 +12,8 @@ enum Theme {
     static let border = Color(hex: 0x30343A)
     static let green = Color(hex: 0x3CCB7F)
     static let red = Color(hex: 0xE5484D)
+    static let accent = Color(hex: 0x8B7CF6)
+    static let star = Color(hex: 0xF5C451)
 
     static let hPadding: CGFloat = 16
     static let cardRadius: CGFloat = 12

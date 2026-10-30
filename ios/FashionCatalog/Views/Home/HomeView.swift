@@ -10,6 +10,7 @@ struct HomeView: View {
 
     @State var search = ""
     @State var showActivity = false
+    @State var showAccount = false
 
     private var visibleProducts: [Product] {
         hideDiscarded ? products.filter { $0.status != .discarded } : products
@@ -21,7 +22,7 @@ struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
-                SearchBar(text: $search, placeholder: "Buscar productos, marcas o links...") {
+                SearchBar(text: $search, placeholder: "Buscar productos...") {
                     if LinkImportService.looksLikeURL(search) { appState.presentAdd(url: search) }
                 }
                 if trimmedSearch.isEmpty {
@@ -40,6 +41,9 @@ struct HomeView: View {
         .background(Theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showActivity) { ActivityView() }
+        .sheet(isPresented: $showAccount) {
+            NavigationStack { AccountView().withAppRoutes() }
+        }
     }
 
     // MARK: Encabezado
@@ -50,6 +54,13 @@ struct HomeView: View {
                 .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(.white)
             Spacer()
+            Button { showAccount = true } label: {
+                Image(systemName: "person.crop.circle")
+                    .font(.system(size: 21, weight: .regular))
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+            }
+            .accessibilityLabel("Cuenta")
             Button { showActivity = true } label: {
                 Image(systemName: "bell")
                     .font(.system(size: 19, weight: .regular))
@@ -70,38 +81,39 @@ struct HomeView: View {
 
     // MARK: Accesos rápidos
 
-    private var quickAccessRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 14) {
-                ForEach(QuickGroup.allCases) { group in
-                    NavigationLink(value: route(for: group)) {
-                        VStack(spacing: 6) {
-                            Image(systemName: group.symbol)
-                                .font(.system(size: 19, weight: .regular))
-                                .foregroundStyle(group == .all ? .black : .white)
-                                .frame(width: 54, height: 46)
-                                .background(group == .all ? Color.white : Theme.card,
-                                            in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            Text(group.label)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.white)
-                        }
-                        .frame(minWidth: 62)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, Theme.hPadding)
-        }
-        .padding(.horizontal, -Theme.hPadding)
+    /// Accesos grandes con foto: la portada es el último producto guardado de ese tipo.
+    private struct QuickTile: Identifiable {
+        let id: String
+        let title: String
+        let symbol: String
+        let route: AppRoute
+        let matches: (Product) -> Bool
     }
 
-    private func route(for group: QuickGroup) -> AppRoute {
-        switch group {
-        case .all: return .allProducts
-        case .clothing, .accessories: return .group(group)
-        case .shoes: return .category(key: "zapatos", subcategory: nil)
-        case .bags: return .category(key: "carteras", subcategory: nil)
+    private var quickTiles: [QuickTile] {
+        let groupOf = Dictionary(categories.map { ($0.key, $0.groupRaw) }, uniquingKeysWith: { a, _ in a })
+        return [
+            QuickTile(id: "ropa", title: "Ropa", symbol: "tshirt", route: .group(.clothing),
+                      matches: { groupOf[$0.categoryKey] == QuickGroup.clothing.rawValue }),
+            QuickTile(id: "zapatos", title: "Zapatos", symbol: "shoe.2", route: .category(key: "zapatos", subcategory: nil),
+                      matches: { $0.categoryKey == "zapatos" }),
+            QuickTile(id: "carteras", title: "Carteras", symbol: "handbag", route: .category(key: "carteras", subcategory: nil),
+                      matches: { $0.categoryKey == "carteras" }),
+            QuickTile(id: "relojes", title: "Relojes", symbol: "clock", route: .category(key: "relojes", subcategory: nil),
+                      matches: { $0.categoryKey == "relojes" }),
+        ]
+    }
+
+    private var quickAccessRow: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+            ForEach(quickTiles) { tile in
+                NavigationLink(value: tile.route) {
+                    PhotoTile(title: tile.title, subtitle: nil,
+                              image: visibleProducts.first(where: tile.matches)?.coverImage,
+                              symbol: tile.symbol, aspect: 0.8)
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
@@ -123,7 +135,7 @@ struct HomeView: View {
 
     private var brandsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionTitle(title: "Marcas populares")
+            SectionTitle(title: "Marcas")
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(brands, id: \.self) { brand in
@@ -142,7 +154,11 @@ struct HomeView: View {
     // MARK: Categorías
 
     private var homeCategories: [CatalogCategory] {
-        Array(categories.filter(\.showOnHome).prefix(7))
+        Array(categories.filter(\.showOnHome).prefix(6))
+    }
+
+    private var countByCategory: [String: Int] {
+        visibleProducts.reduce(into: [:]) { $0[$1.categoryKey, default: 0] += 1 }
     }
 
     private var coverByCategory: [String: ProductImage] {
@@ -155,29 +171,30 @@ struct HomeView: View {
 
     private var categoriesSection: some View {
         let covers = coverByCategory
+        let counts = countByCategory
         return VStack(alignment: .leading, spacing: 10) {
-            SectionTitle(title: "Categorías")
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+            HStack {
+                SectionTitle(title: "Categorías")
+                Spacer()
+                NavigationLink(value: AppRoute.allCategories) {
+                    HStack(spacing: 3) {
+                        Text("Ver todas")
+                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                    }
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.textSecondary)
+                }
+                .buttonStyle(.plain)
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2), spacing: 10) {
                 ForEach(homeCategories) { category in
+                    let n = counts[category.key] ?? 0
                     NavigationLink(value: AppRoute.category(key: category.key, subcategory: nil)) {
-                        CategoryTile(title: category.name, image: covers[category.key], symbol: category.symbol)
+                        PhotoTile(title: category.name, subtitle: "\(n) producto\(n == 1 ? "" : "s")",
+                                  image: covers[category.key], symbol: category.symbol, aspect: 1.45)
                     }
                     .buttonStyle(.plain)
                 }
-                NavigationLink(value: AppRoute.allCategories) {
-                    ZStack {
-                        Theme.card
-                        VStack(spacing: 6) {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 22, weight: .semibold))
-                            Text("Más").font(.system(size: 12, weight: .medium))
-                        }
-                        .foregroundStyle(.white)
-                    }
-                    .aspectRatio(0.78, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
-                }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -236,19 +253,64 @@ struct BrandTile: View {
         return words.compactMap { $0.first.map(String.init) }.joined().uppercased()
     }
 
+    /// Nombre en tipografía serif (no se reproducen logotipos oficiales).
     var body: some View {
-        VStack(spacing: 6) {
-            Text(initials)
-                .font(.system(size: 20, weight: .semibold, design: .serif))
-                .foregroundStyle(.white)
-                .frame(width: 60, height: 52)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            Text(name)
-                .font(.system(size: 11))
-                .foregroundStyle(Theme.textSecondary)
-                .lineLimit(1)
-                .frame(width: 64)
-        }
+        Text(name.count <= 6 ? name : initials)
+            .font(.system(size: name.count <= 6 ? 17 : 22, weight: .semibold, design: .serif))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .padding(.horizontal, 6)
+            .frame(width: 66, height: 58)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.06), lineWidth: 0.5))
+            .accessibilityLabel(name)
+    }
+}
+
+/// Tarjeta con foto a sangre, degradado y texto abajo a la izquierda.
+struct PhotoTile: View {
+    let title: String
+    var subtitle: String?
+    var image: ProductImage?
+    var symbol: String = "photo"
+    var aspect: CGFloat = 1
+
+    var body: some View {
+        Color.clear
+            .aspectRatio(aspect, contentMode: .fit)
+            .overlay {
+                if let image {
+                    CatalogImage(image: image, maxPixel: 600, placeholderSymbol: symbol)
+                } else {
+                    ZStack {
+                        LinearGradient(colors: [Theme.card, Theme.chip], startPoint: .top, endPoint: .bottom)
+                        Image(systemName: symbol)
+                            .font(.system(size: 30, weight: .light))
+                            .foregroundStyle(Theme.textSecondary.opacity(0.7))
+                            .offset(y: -10)
+                    }
+                }
+            }
+            .overlay {
+                LinearGradient(colors: [.clear, .clear, .black.opacity(0.75)], startPoint: .top, endPoint: .bottom)
+            }
+            .overlay(alignment: .bottomLeading) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.system(size: subtitle == nil ? 13 : 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                }
+                .padding(10)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.06), lineWidth: 0.5))
     }
 }
 

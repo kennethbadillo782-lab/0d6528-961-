@@ -147,20 +147,10 @@ struct ProductDetailView: View {
 
     private var titleAndPrice: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !product.brand.trimmed.isEmpty {
-                Text(product.brand.uppercased())
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.textSecondary)
-            }
-            Text(product.displayName)
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
-                .fixedSize(horizontal: false, vertical: true)
-
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 if let price = product.priceCurrent {
                     Text(Money.format(price, code: product.currency))
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(.white)
                     if let previous = product.pricePrevious, product.discountPercent != nil {
                         Text(Money.format(previous, code: product.currency))
@@ -176,12 +166,34 @@ struct ProductDetailView: View {
                             .background(Theme.red.opacity(0.16), in: RoundedRectangle(cornerRadius: 6))
                     }
                 } else {
-                    Text("Sin precio guardado")
-                        .font(.system(size: 16))
+                    Text("Precio no disponible")
+                        .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(Theme.textSecondary)
                 }
+                Spacer(minLength: 8)
+                if let rating = product.sellerRating {
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill").foregroundStyle(Theme.star)
+                        Text(String(format: "%.1f", rating)).foregroundStyle(.white)
+                    }
+                    .font(.system(size: 14, weight: .medium))
+                }
+            }
+            Text(product.displayName)
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
+            if !product.brand.trimmed.isEmpty {
+                Text(product.brand.uppercased())
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.textSecondary)
             }
         }
+    }
+
+    /// Tienda de origen para "Comprar": el enlace original y, si falta, el primer agente.
+    private var buyURL: URL? {
+        validURL(product.originalURL) ?? product.agentLinks.lazy.compactMap { validURL($0.url) }.first
     }
 
     private var tags: some View {
@@ -243,29 +255,42 @@ struct ProductDetailView: View {
     }
 
     private var sellerCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top) {
+        let seller = product.sellerName.trimmed
+        let shown = seller.isEmpty ? (product.platform.trimmed.isEmpty ? "Sin especificar" : product.platform) : seller
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
                 Text("Vendedor")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.textSecondary)
-                Spacer()
-                VStack(alignment: .trailing, spacing: 3) {
-                    Text(product.sellerName.trimmed.isEmpty ? "Sin especificar" : product.sellerName)
+                Text(String(shown.prefix(1)).uppercased())
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+                    .background(Theme.accent.opacity(0.35), in: Circle())
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(shown)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.white)
-                    if !product.platform.trimmed.isEmpty {
+                        .lineLimit(1)
+                    if !seller.isEmpty, !product.platform.trimmed.isEmpty {
                         Text(product.platform)
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                             .foregroundStyle(Theme.textSecondary)
                     }
                 }
-                if let rating = product.sellerRating {
-                    HStack(spacing: 3) {
-                        Image(systemName: "star.fill").foregroundStyle(.yellow)
-                        Text(String(format: "%.1f", rating)).foregroundStyle(.white)
+                Spacer(minLength: 4)
+                if let url = buyURL {
+                    Button { openURL(url) } label: {
+                        HStack(spacing: 3) {
+                            Text("Visitar")
+                            Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                        }
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(Theme.chip, in: Capsule())
                     }
-                    .font(.system(size: 13, weight: .medium))
-                    .padding(.leading, 8)
+                    .buttonStyle(.plain)
                 }
             }
             if product.sellerRating != nil, !product.sellerRatingSource.trimmed.isEmpty {
@@ -282,28 +307,19 @@ struct ProductDetailView: View {
         let links = product.agentLinks.filter { validURL($0.url) != nil }
         let original = validURL(product.originalURL)
         return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 8) {
-                Text("Abrir en\nagente")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.textSecondary)
-                    .frame(width: 54, alignment: .leading)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(links) { link in
-                            AgentButton(title: link.name, symbol: "bag") {
-                                if let url = validURL(link.url) { openURL(url) }
-                            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(links) { link in
+                        AgentButton(title: link.name, symbol: "bag.fill") {
+                            if let url = validURL(link.url) { openURL(url) }
                         }
-                        if let original {
-                            AgentButton(title: "Original", symbol: "safari") { openURL(original) }
-                        }
-                        AgentButton(title: "Copiar", symbol: "doc.on.doc") {
-                            UIPasteboard.general.string = original?.absoluteString ?? links.first?.url ?? ""
-                            appState.showToast("Enlace copiado")
-                        }
-                        .disabled(original == nil && links.isEmpty)
-                        .opacity(original == nil && links.isEmpty ? 0.4 : 1)
                     }
+                    AgentButton(title: "Copiar enlace", symbol: "doc.on.doc") {
+                        UIPasteboard.general.string = original?.absoluteString ?? links.first?.url ?? ""
+                        appState.showToast("Enlace copiado")
+                    }
+                    .disabled(original == nil && links.isEmpty)
+                    .opacity(original == nil && links.isEmpty ? 0.4 : 1)
                 }
             }
             if links.isEmpty {
@@ -414,16 +430,39 @@ struct ProductDetailView: View {
 
     private var bottomBar: some View {
         let count = product.collections.count
-        return Button {
-            showCollections = true
-        } label: {
-            HStack(spacing: 8) {
-                if count > 0 { Image(systemName: "checkmark") }
-                Text(count == 0 ? "Guardar en colección"
-                     : "Guardado en \(count) colección\(count == 1 ? "" : "es")")
+        let url = buyURL
+        return HStack(spacing: 10) {
+            Button {
+                if let url { openURL(url) }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "bag")
+                    Text(url == nil ? "Sin enlace de tienda" : "Comprar")
+                }
+            }
+            .buttonStyle(PrimaryButtonStyle(isEnabled: url != nil))
+            .disabled(url == nil)
+
+            Button { showCollections = true } label: {
+                Image(systemName: count > 0 ? "folder.fill" : "folder.badge.plus")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.white)
+                    .frame(width: 52, height: 52)
+                    .background(Theme.chip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(count == 0 ? "Guardar en colección" : "En \(count) colecciones")
+
+            if let share = validURL(product.originalURL) {
+                ShareLink(item: share) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.white)
+                        .frame(width: 52, height: 52)
+                        .background(Theme.chip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
             }
         }
-        .buttonStyle(PrimaryButtonStyle())
         .padding(.horizontal, Theme.hPadding)
         .padding(.top, 8)
         .padding(.bottom, 6)
@@ -475,16 +514,18 @@ struct AgentButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 4) {
+            HStack(spacing: 7) {
                 Image(systemName: symbol)
-                    .font(.system(size: 15))
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.accent)
                 Text(title)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)
             }
             .foregroundStyle(.white)
-            .frame(width: 64, height: 50)
-            .background(Theme.chip, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .padding(.horizontal, 14)
+            .frame(minWidth: 96, minHeight: 40)
+            .background(Theme.chip, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
     }

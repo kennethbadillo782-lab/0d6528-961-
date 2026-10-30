@@ -2,7 +2,8 @@ import SwiftUI
 import SwiftData
 
 enum AppTab: Hashable {
-    case home, explore, saved, collections, account
+    // "add" no es una pantalla: al tocarla se abre la hoja de agregar producto.
+    case home, explore, add, saved, collections
 }
 
 struct AddProductRequest: Identifiable {

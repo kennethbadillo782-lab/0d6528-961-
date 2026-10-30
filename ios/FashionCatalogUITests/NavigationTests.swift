@@ -5,7 +5,8 @@ final class NavigationTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments += ["-AppleLanguages", "(es)", "-AppleLocale", "es_ES"]
         app.launch()
-        for title in ["Inicio", "Explorar", "Guardados", "Colecciones", "Cuenta"] {
+        // "Agregar" abre una hoja, no una pestaña; Cuenta está en el icono de Inicio.
+        for title in ["Inicio", "Explorar", "Guardados", "Colecciones"] {
             let tab = app.tabBars.buttons[title]
             XCTAssertTrue(tab.waitForExistence(timeout: 15), "Falta pestaña \(title)")
             tab.tap()
