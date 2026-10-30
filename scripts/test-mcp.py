@@ -68,8 +68,11 @@ s, _, _ = http('GET', BASE + '/authorize?' + urllib.parse.urlencode({**q, 'code_
 check('sin PKCE S256 → 400', s == 400)
 s, _, _ = http('GET', BASE + '/authorize?' + urllib.parse.urlencode(dict(q, client_id='https://chatgpt.com/oauth/client.json', redirect_uri='https://evil.example/cb')))
 check('cliente CIMD con destino ajeno → 400', s == 400)
-s, _, b = http('GET', BASE + '/authorize/callback?req=x&code=abcdefgh')
-check('callback falso → 400 en texto plano', s == 400 and 'Enlace no válido' in b)
+s, _, b = http('GET', BASE + '/authorize?' + urllib.parse.urlencode(q))
+req_token = urllib.parse.parse_qs(urllib.parse.urlparse(b[b.find('https://'):].split()[0]).query).get('req', [''])[0] if s == 200 else ''
+check('autorización muestra la dirección de aprobación', s == 200 and 'AÑADIR productos' in b and req_token)
+s, _, b = http('GET', BASE + '/authorize/approve?' + urllib.parse.urlencode({'req': req_token, 'pin': 'CODIGOFALSO1'}))
+check('código de emparejamiento incorrecto → 403', s == 403)
 
 # --- Tokens con firma temporal conocida ---
 secret = secrets.token_urlsafe(48); set_secret(secret); time.sleep(20)

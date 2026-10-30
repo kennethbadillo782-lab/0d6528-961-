@@ -7,10 +7,11 @@
 //                         Cambiarlo revoca al instante todas las conexiones.
 //   MCP_CATALOG_API_KEY   clave mc_ de catalog-api con permiso SOLO "create".
 //   MCP_OWNER_ID          UID del único usuario de Auth autorizado.
+//   MCP_PAIRING_PIN       código privado del propietario para aprobar la conexión.
 //
 // Transporte: MCP Streamable HTTP sin estado (respuestas JSON) en POST /mcp.
-// Autorización: OAuth 2.1 con PKCE S256 propio. El usuario aprueba tocando,
-// en el mismo navegador, el enlace de acceso que Supabase Auth envía a su correo.
+// Autorización: OAuth 2.1 con PKCE S256 propio. El propietario aprueba con su
+// código de emparejamiento privado (secreto MCP_PAIRING_PIN).
 // Solo dos herramientas: listCategories (lectura de categorías) y
 // createProduct (alta). No hay lectura del catálogo, edición ni borrado:
 // todo pasa por catalog-api con una clave sin permiso de lectura.
@@ -23,6 +24,7 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SECRET = Deno.env.get("MCP_SIGNING_SECRET") ?? "";
 const API_KEY = Deno.env.get("MCP_CATALOG_API_KEY") ?? "";
 const OWNER = (Deno.env.get("MCP_OWNER_ID") ?? "").toLowerCase();
+const PIN = Deno.env.get("MCP_PAIRING_PIN") ?? "";
 const PUBLIC_BASE = (SUPABASE_URL.replace("http://", "https://")) + "/functions/v1/catalog-mcp";
 const ISSUER = PUBLIC_BASE;
 const RESOURCE = PUBLIC_BASE + "/mcp";
@@ -131,17 +133,14 @@ async function register(req: Request) {
   return json(201, { client_id: clientId, redirect_uris: uris, token_endpoint_auth_method: "none", grant_types: ["authorization_code", "refresh_token"], response_types: ["code"] });
 }
 
-// ---------- autorización con enlace por correo ----------
-// Al conectar, se envía el enlace de acceso de Supabase Auth al correo del propietario.
-// Al tocarlo en este mismo navegador, vuelve aquí y redirige a ChatGPT con el código.
-async function ownerEmail(): Promise<string | null> {
-  const { data, error } = await db.auth.admin.getUserById(OWNER);
-  return error || !data.user?.email ? null : data.user.email;
-}
-function mask(email: string) { const [u, d] = email.split("@"); return u.slice(0, 2) + "•••@" + d; }
-// Verificador PKCE de Supabase Auth derivado del nonce: no hace falta guardarlo.
-async function authVerifier(n: string) {
-  return b64u(new Uint8Array(await crypto.subtle.sign("HMAC", await key(), enc.encode("auth-pkce|" + n))));
+// ---------- autorización con código de emparejamiento ----------
+// Supabase no deja mostrar páginas web en *.supabase.co y su correo gratuito permite ~2 envíos/hora,
+// así que el propietario aprueba añadiendo su código privado (secreto MCP_PAIRING_PIN) a la dirección.
+async function sameSecret(a: string, b: string) {
+  const [x, y] = await Promise.all([sha256b64u("pin|" + a), sha256b64u("pin|" + b)]);
+  let d = x.length ^ y.length;
+  for (let i = 0; i < Math.min(x.length, y.length); i++) d |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  return d === 0;
 }
 
 async function authorizeStart(url: URL) {
@@ -154,43 +153,29 @@ async function authorizeStart(url: URL) {
   if (resource !== RESOURCE && resource !== PUBLIC_BASE) return text(400, "Solicitud no válida: recurso desconocido.");
   const allowed = await clientRedirects(clientId).catch(() => null);
   if (!allowed || !allowed.includes(redirect)) return text(400, "Solicitud no válida: este cliente no está autorizado.");
-  const n = crypto.randomUUID();
-  const reqToken = await sign({ t: "areq", cid: clientId, ru: redirect, cc: challenge, st: (q.get("state") ?? "").slice(0, 512), exp: now() + 900, n });
-  const email = await ownerEmail();
-  if (!email) return text(500, "El servidor no tiene usuario autorizado.");
-  if (!await consume("mcp-link-send", 3600, 6)) return text(429, "Demasiados intentos. Espera un rato y vuelve a conectar desde ChatGPT.");
-  const back = ISSUER + "/authorize/callback?req=" + encodeURIComponent(reqToken);
-  const r = await fetch(SUPABASE_URL + "/auth/v1/otp?redirect_to=" + encodeURIComponent(back), {
-    method: "POST", headers: { apikey: ANON_KEY, "content-type": "application/json" },
-    body: JSON.stringify({ email, create_user: false, code_challenge: await sha256b64u(await authVerifier(n)), code_challenge_method: "s256" }) });
-  if (!r.ok) return text(429, "Supabase no envió el correo: su servicio gratuito solo permite unos 2 correos de acceso por hora (contando los de la app). Espera hasta una hora después del último correo recibido y vuelve a conectar desde ChatGPT.");
+  const reqToken = await sign({ t: "areq", cid: clientId, ru: redirect, cc: challenge, st: (q.get("state") ?? "").slice(0, 512), exp: now() + 900, n: crypto.randomUUID() });
+  const approve = ISSUER + "/authorize/approve?req=" + encodeURIComponent(reqToken) + "&pin=";
   return text(200, `Mi Catálogo · Conectar ChatGPT
 
 ChatGPT pide permiso para AÑADIR productos a tu catálogo. No podrá leer, editar ni borrar lo que ya tienes.
 
-Enviamos un enlace de acceso a ${mask(email)}.
-Ábrelo EN ESTE MISMO NAVEGADOR y toca el enlace: volverás a ChatGPT ya conectado.
-El enlace caduca en 15 minutos. Puedes cerrar esta pestaña después.`);
+Para aprobarlo:
+1. Copia la dirección de abajo completa.
+2. Pégala en la barra de direcciones de ESTE navegador.
+3. Escribe al final tu código de emparejamiento (está en el archivo de tu PC) y pulsa Enter.
+
+${approve}
+
+Caduca en 15 minutos.`);
 }
 
-// El enlace del correo vuelve aquí con un código PKCE de Supabase Auth.
-async function authorizeCallback(url: URL) {
+async function authorizeApprove(url: URL) {
   const reqToken = url.searchParams.get("req") ?? "";
   const p = await verify(reqToken, "areq");
-  const code = url.searchParams.get("code") ?? "";
-  // Supabase Auth devuelve aquí sus propios errores (enlace usado, anulado por uno más nuevo, vencido).
-  const authError = (url.searchParams.get("error_description") ?? url.searchParams.get("error_code") ?? "").slice(0, 200).replace(/[^\p{L}\p{N} .,:_-]/gu, "");
-  if (!p) return text(400, "La solicitud de ChatGPT caducó (15 minutos). Vuelve a ChatGPT y pulsa Conectar una sola vez.");
-  if (!/^[A-Za-z0-9-]{8,128}$/.test(code)) return text(400, "Enlace no válido o caducado" + (authError ? ` (Supabase: ${authError})` : "") + ".\nUsa solo el ÚLTIMO correo: cada vez que pulsas Conectar se anula el enlace anterior.\nVuelve a ChatGPT, pulsa Conectar una vez y espera ese correo.");
-  const r = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=pkce", { method: "POST", headers: { apikey: ANON_KEY, "content-type": "application/json" },
-    body: JSON.stringify({ auth_code: code, code_verifier: await authVerifier(String(p.n)) }) });
-  const session = r.ok ? await r.json().catch(() => null) : null;
-  const uid = String(session?.user?.id ?? "").toLowerCase();
-  if (session?.access_token) {
-    // La sesión de Auth solo prueba la identidad; se cierra al momento.
-    await fetch(SUPABASE_URL + "/auth/v1/logout?scope=local", { method: "POST", headers: { apikey: ANON_KEY, authorization: "Bearer " + session.access_token } }).catch(() => {});
-  }
-  if (!uid || uid !== OWNER) return text(400, "No autorizado: el enlace venció, ya se usó o no corresponde a tu cuenta. Conecta otra vez desde ChatGPT.");
+  if (!p) return text(400, "La solicitud de ChatGPT caducó (15 minutos). Vuelve a ChatGPT y pulsa Conectar otra vez.");
+  if (!await consume("mcp-pin-try", 3600, 10)) return text(429, "Demasiados intentos. Espera una hora y vuelve a conectar desde ChatGPT.");
+  const pin = (url.searchParams.get("pin") ?? "").trim();
+  if (!PIN || pin.length < 8 || pin.length > 64 || !await sameSecret(pin, PIN)) return text(403, "Código de emparejamiento incorrecto. Revisa el archivo de tu PC y vuelve a intentarlo.");
   if (!await consume("mcp-issued-" + String(p.n), 86400, 1)) return text(400, "Esta autorización ya se completó.");
   const authCode = await sign({ t: "code", cid: p.cid, ru: p.ru, cc: p.cc, sub: OWNER, exp: now() + 120, j: crypto.randomUUID() });
   const dest = new URL(String(p.ru));
@@ -410,7 +395,7 @@ Deno.serve(async (req) => {
     if (path === "/mcp") return await mcp(req);
     if (path === "/register" && req.method === "POST") return await register(req);
     if (path === "/authorize" && req.method === "GET") return await authorizeStart(url);
-    if (path === "/authorize/callback" && req.method === "GET") return await authorizeCallback(url);
+    if (path === "/authorize/approve" && req.method === "GET") return await authorizeApprove(url);
     if (path === "/token" && req.method === "POST") return await tokenEndpoint(req);
     if (path === "/health") return json(200, { ok: true });
     return json(404, { error: "No encontrado" });
