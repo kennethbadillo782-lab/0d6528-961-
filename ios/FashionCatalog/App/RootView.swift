@@ -61,7 +61,8 @@ struct RootView: View {
                     // Productos guardados sin fotos: se buscan en su página y la próxima sincronización las sube.
                     await PhotoBackfill.shared.run(context: context)
                 }
-                try? await Task.sleep(for: .seconds(8))
+                // Cada 20 s basta: al volver a la app ya se sincroniza al instante (onChange de abajo).
+                try? await Task.sleep(for: .seconds(20))
             }
         }
         .onChange(of: scenePhase) { _, phase in

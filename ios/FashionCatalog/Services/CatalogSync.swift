@@ -168,11 +168,17 @@ final class CatalogSync: ObservableObject {
         for table in CloudMapping.tables {
             var keys = Set((remote[table] ?? []).map { CloudMapping.key($0,table:table) })
             keys.formUnion(entries.filter { $0.table == table }.map(\.rowKey))
+            // Índices por clave: antes cada fila buscaba en todas las demás (cuadrático).
+            let remoteByKey = Dictionary((remote[table] ?? []).map { (CloudMapping.key($0,table:table),$0) }, uniquingKeysWith: { _,b in b })
+            let localByKey = Dictionary(local.filter { $0.table == table }.map { ($0.key,$0) }, uniquingKeysWith: { a,_ in a })
             for key in keys.sorted() {
-                let r = remote[table]?.first { CloudMapping.key($0,table:table) == key }
-                let snapshot = local.first { $0.table == table && $0.key == key }
+                let r = remoteByKey[key]
+                let snapshot = localByKey[key]
                 var entry = entries.first { $0.table == table && $0.rowKey == key }
                 let dirty = entry?.pendingSince != nil
+                // Ya aplicada esa misma versión del servidor y sin cambios locales: nada que hacer.
+                // Antes se reaplicaban y guardaban todas las filas cada 8 s, y la app iba a tirones.
+                if !dirty, let stamp = r?["updated_at"] as? String, !stamp.isEmpty, entry?.remoteStamp == stamp { continue }
                 let remoteDate = CloudMapping.date(r?["updated_at"])
                 // El servidor gana cuando su fecha es posterior al cambio local pendiente.
                 let remoteWins = !dirty || (remoteDate != nil && entry?.pendingSince != nil && remoteDate! > entry!.pendingSince!)
