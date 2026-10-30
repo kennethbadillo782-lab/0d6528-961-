@@ -122,18 +122,7 @@ struct HomeView: View {
     // MARK: Marcas
 
     /// Solo las marcas que ya tienes guardadas: aparecen a medida que guardas productos de cada una.
-    private var brands: [String] {
-        var counts: [String: Int] = [:]
-        var display: [String: String] = [:]
-        for p in visibleProducts where !p.brand.trimmed.isEmpty {
-            let key = BrandLibrary.key(p.brand)
-            guard !key.isEmpty else { continue }
-            counts[key, default: 0] += 1
-            if display[key] == nil { display[key] = p.brand.trimmed }
-        }
-        let sorted = counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
-        return sorted.compactMap { display[$0.key] }
-    }
+    private var brands: [String] { BrandLibrary.ranked(in: visibleProducts).map(\.name) }
 
     @ViewBuilder
     private var brandsSection: some View {
@@ -143,27 +132,30 @@ struct HomeView: View {
         }
     }
 
+    /// Como la referencia: las 5 marcas con más productos, a todo el ancho, y "Ver todas" para el resto.
     private func brandsRow(_ brands: [String]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack {
                 SectionTitle(title: "Marcas")
                 Spacer()
-                Text("\(brands.count) en tu lista")
+                NavigationLink(value: AppRoute.allBrands) {
+                    HStack(spacing: 3) {
+                        Text("Ver todas")
+                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                    }
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.textSecondary)
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(brands, id: \.self) { brand in
-                        NavigationLink(value: AppRoute.brand(brand)) {
-                            BrandTile(name: brand)
-                        }
-                        .buttonStyle(.plain)
-                    }
                 }
-                .padding(.horizontal, Theme.hPadding)
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, -Theme.hPadding)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
+                ForEach(brands.prefix(5), id: \.self) { brand in
+                    NavigationLink(value: AppRoute.brand(brand)) {
+                        BrandTile(name: brand)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 
@@ -285,7 +277,8 @@ struct BrandTile: View {
                     .padding(.horizontal, 6)
             }
         }
-        .frame(width: 68, height: 68)
+        .frame(maxWidth: .infinity)
+        .aspectRatio(1, contentMode: .fit)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.07), lineWidth: 0.5))
         .accessibilityLabel(shown)

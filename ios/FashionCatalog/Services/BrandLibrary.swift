@@ -42,6 +42,20 @@ enum BrandLibrary {
         byKey[key(brand)]?.name ?? brand.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Marcas de una lista de productos, de la que más productos tiene a la que menos.
+    static func ranked(in products: [Product]) -> [(name: String, count: Int)] {
+        var counts: [String: Int] = [:]
+        var display: [String: String] = [:]
+        for p in products where !p.brand.trimmed.isEmpty {
+            let k = key(p.brand)
+            guard !k.isEmpty else { continue }
+            counts[k, default: 0] += 1
+            if display[k] == nil { display[k] = p.brand.trimmed }
+        }
+        return counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
+            .compactMap { item in display[item.key].map { (name: $0, count: item.value) } }
+    }
+
     static func logoHasColor(_ brand: String) -> Bool { byKey[key(brand)]?.logoColor ?? false }
 
     /// Logo verificado incluido en la app, si existe para esa marca.

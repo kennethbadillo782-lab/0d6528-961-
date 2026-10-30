@@ -129,6 +129,7 @@ enum AppRoute: Hashable {
     case brand(String)
     case allProducts
     case allCategories
+    case allBrands
     case collection(ProductCollection)
     case categoriesManager
     case categoryEditor(CatalogCategory)
@@ -150,6 +151,8 @@ extension View {
                 ProductBrowserScreen(title: "Todo", scope: .all)
             case .allCategories:
                 AllCategoriesView()
+            case .allBrands:
+                AllBrandsView()
             case .collection(let collection):
                 CollectionDetailView(collection: collection)
             case .categoriesManager:
