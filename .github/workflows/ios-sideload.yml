@@ -1,6 +1,11 @@
 name: iOS SideStore IPA
 on:
   workflow_dispatch:
+    inputs:
+      publicar:
+        description: Publicar en la fuente de SideStore (necesita el secreto UPDATES_TOKEN)
+        type: boolean
+        default: true
 permissions:
   contents: read
 concurrency:
@@ -27,3 +32,13 @@ jobs:
             build/MiCatalogo.ipa
             build/source.json
             reports/ios-sideload-build.log
+      - name: Publish to SideStore source
+        if: inputs.publicar
+        env:
+          GH_TOKEN: ${{ secrets.UPDATES_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::Falta el secreto UPDATES_TOKEN: la IPA se compiló pero no se publicó."
+            exit 0
+          fi
+          bash scripts/publish-update.sh
