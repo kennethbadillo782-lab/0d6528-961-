@@ -61,15 +61,15 @@ s, _, b = http('POST', BASE + '/register', {'redirect_uris': ['https://chatgpt.c
 client = json.loads(b).get('client_id', ''); check('registro dinámico para ChatGPT', s == 201 and client)
 verifier = secrets.token_urlsafe(48); challenge = b64u(hashlib.sha256(verifier.encode()).digest())
 q = {'response_type': 'code', 'client_id': client, 'redirect_uri': 'https://chatgpt.com/connector_platform_oauth_redirect', 'code_challenge': challenge, 'code_challenge_method': 'S256', 'state': 'xyz', 'resource': RESOURCE}
-s, _, b = http('GET', BASE + '/authorize?' + urllib.parse.urlencode(q))
-check('pantalla de autorización', s == 200 and 'añadir productos' in b)
+# Una autorización válida envía un correo real al propietario: no se lanza aquí.
 s, _, _ = http('GET', BASE + '/authorize?' + urllib.parse.urlencode({**q, 'redirect_uri': 'https://evil.example/cb'}))
 check('autorización a destino ajeno → 400', s == 400)
 s, _, _ = http('GET', BASE + '/authorize?' + urllib.parse.urlencode({**q, 'code_challenge_method': 'plain'}))
 check('sin PKCE S256 → 400', s == 400)
-cimd = dict(q, client_id='https://chatgpt.com/oauth/client.json')
-s, _, b = http('GET', BASE + '/authorize?' + urllib.parse.urlencode(cimd))
-check('cliente CIMD oficial de ChatGPT', s == 200, f'HTTP {s}')
+s, _, _ = http('GET', BASE + '/authorize?' + urllib.parse.urlencode(dict(q, client_id='https://chatgpt.com/oauth/client.json', redirect_uri='https://evil.example/cb')))
+check('cliente CIMD con destino ajeno → 400', s == 400)
+s, _, b = http('GET', BASE + '/authorize/callback?req=x&code=abcdefgh')
+check('callback falso → 400 en texto plano', s == 400 and 'Enlace no válido' in b)
 
 # --- Tokens con firma temporal conocida ---
 secret = secrets.token_urlsafe(48); set_secret(secret); time.sleep(20)

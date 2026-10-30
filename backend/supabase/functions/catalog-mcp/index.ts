@@ -9,9 +9,8 @@
 //   MCP_OWNER_ID          UID del único usuario de Auth autorizado.
 //
 // Transporte: MCP Streamable HTTP sin estado (respuestas JSON) en POST /mcp.
-// Autorización: OAuth 2.1 con PKCE S256 propio. El usuario aprueba tocando
-// el enlace de acceso que Supabase Auth envía a su correo (en cualquier
-// dispositivo); la página de ChatGPT espera y continúa sola.
+// Autorización: OAuth 2.1 con PKCE S256 propio. El usuario aprueba tocando,
+// en el mismo navegador, el enlace de acceso que Supabase Auth envía a su correo.
 // Solo dos herramientas: listCategories (lectura de categorías) y
 // createProduct (alta). No hay lectura del catálogo, edición ni borrado:
 // todo pasa por catalog-api con una clave sin permiso de lectura.
@@ -45,11 +44,10 @@ const BASE_HEADERS = {
 function json(status: number, body: unknown, extra: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), { status, headers: { ...BASE_HEADERS, "content-type": "application/json; charset=utf-8", ...extra } });
 }
-function html(status: number, body: string) {
-  return new Response(body, { status, headers: { ...BASE_HEADERS, "content-type": "text/html; charset=utf-8",
-    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://chatgpt.com; frame-ancestors 'none'; base-uri 'none'" } });
+// Supabase convierte text/html en text/plain en *.supabase.co: las respuestas al navegador son texto.
+function text(status: number, body: string) {
+  return new Response(body + "\n", { status, headers: { ...BASE_HEADERS, "content-type": "text/plain; charset=utf-8" } });
 }
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
 // ---------- firma HMAC (tokens sin estado) ----------
 const enc = new TextEncoder();
@@ -133,57 +131,46 @@ async function register(req: Request) {
   return json(201, { client_id: clientId, redirect_uris: uris, token_endpoint_auth_method: "none", grant_types: ["authorization_code", "refresh_token"], response_types: ["code"] });
 }
 
-// ---------- autorización con código por correo ----------
-function page(title: string, inner: string) {
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
-<style>body{margin:0;background:#030405;color:#f2f2f2;font:16px -apple-system,system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center}
-main{background:#121417;border:.5px solid rgba(255,255,255,.07);border-radius:18px;padding:28px;max-width:380px;width:calc(100% - 32px)}
-h1{font-size:22px;margin:0 0 12px}p{color:#b8bcc4;line-height:1.45}input{width:100%;box-sizing:border-box;font-size:22px;letter-spacing:6px;text-align:center;padding:12px;border-radius:12px;border:1px solid #333;background:#0b0c0e;color:#fff}
-button{width:100%;margin-top:14px;padding:13px;border:0;border-radius:12px;background:#f2f2f2;color:#030405;font-size:16px;font-weight:600}.err{color:#ff8a80}</style></head>
-<body><main><h1>${esc(title)}</h1>${inner}</main></body></html>`;
-}
+// ---------- autorización con enlace por correo ----------
+// Al conectar, se envía el enlace de acceso de Supabase Auth al correo del propietario.
+// Al tocarlo en este mismo navegador, vuelve aquí y redirige a ChatGPT con el código.
 async function ownerEmail(): Promise<string | null> {
   const { data, error } = await db.auth.admin.getUserById(OWNER);
   return error || !data.user?.email ? null : data.user.email;
 }
 function mask(email: string) { const [u, d] = email.split("@"); return u.slice(0, 2) + "•••@" + d; }
+// Verificador PKCE de Supabase Auth derivado del nonce: no hace falta guardarlo.
+async function authVerifier(n: string) {
+  return b64u(new Uint8Array(await crypto.subtle.sign("HMAC", await key(), enc.encode("auth-pkce|" + n))));
+}
 
 async function authorizeStart(url: URL) {
   const q = url.searchParams;
   const clientId = q.get("client_id") ?? "", redirect = q.get("redirect_uri") ?? "", challenge = q.get("code_challenge") ?? "";
   const resource = q.get("resource") ?? RESOURCE;
   if (q.get("response_type") !== "code" || q.get("code_challenge_method") !== "S256" || !/^[A-Za-z0-9_-]{43,128}$/.test(challenge)) {
-    return html(400, page("Solicitud no válida", "<p>Falta PKCE S256 o el tipo de respuesta no es válido.</p>"));
+    return text(400, "Solicitud no válida: falta PKCE S256 o el tipo de respuesta no es válido.");
   }
-  if (resource !== RESOURCE && resource !== PUBLIC_BASE) return html(400, page("Solicitud no válida", "<p>Recurso desconocido.</p>"));
+  if (resource !== RESOURCE && resource !== PUBLIC_BASE) return text(400, "Solicitud no válida: recurso desconocido.");
   const allowed = await clientRedirects(clientId).catch(() => null);
-  if (!allowed || !allowed.includes(redirect)) return html(400, page("Solicitud no válida", "<p>Este cliente no está autorizado.</p>"));
-  const reqToken = await sign({ t: "areq", cid: clientId, ru: redirect, cc: challenge, st: (q.get("state") ?? "").slice(0, 512), exp: now() + 900, n: crypto.randomUUID() });
-  return html(200, page("Conectar ChatGPT con Mi Catálogo", `<p>ChatGPT pide permiso para <b>añadir productos</b> a tu catálogo. No podrá leer, editar ni borrar lo que ya tienes.</p>
-<form method="post" action="${ISSUER}/authorize/send"><input type="hidden" name="req" value="${esc(reqToken)}"><button>Enviar código a mi correo</button></form>`));
-}
-
-// Verificador PKCE de Supabase Auth derivado del nonce: no hace falta guardarlo.
-async function authVerifier(n: string) {
-  return b64u(new Uint8Array(await crypto.subtle.sign("HMAC", await key(), enc.encode("auth-pkce|" + n))));
-}
-const waitPage = (reqToken: string, note: string) => html(200, page("Revisa tu correo", `${note}
-<p>Toca el enlace del correo <b>en el móvil o aquí</b>. Esta página continúa sola cuando lo apruebes.</p>
-<meta http-equiv="refresh" content="3;url=${ISSUER}/authorize/wait?req=${encodeURIComponent(reqToken)}">`));
-
-async function authorizeSend(form: FormData) {
-  const reqToken = String(form.get("req") ?? "");
-  const p = await verify(reqToken, "areq");
-  if (!p) return html(400, page("Solicitud caducada", "<p>Vuelve a ChatGPT e inténtalo otra vez.</p>"));
+  if (!allowed || !allowed.includes(redirect)) return text(400, "Solicitud no válida: este cliente no está autorizado.");
+  const n = crypto.randomUUID();
+  const reqToken = await sign({ t: "areq", cid: clientId, ru: redirect, cc: challenge, st: (q.get("state") ?? "").slice(0, 512), exp: now() + 900, n });
   const email = await ownerEmail();
-  if (!email) return html(500, page("No configurado", "<p>El servidor no tiene usuario autorizado.</p>"));
-  if (!await consume("mcp-link-send", 3600, 6)) return html(429, page("Demasiados intentos", "<p>Espera un rato antes de pedir otro enlace.</p>"));
-  const redirect = ISSUER + "/authorize/callback?req=" + encodeURIComponent(reqToken);
-  const r = await fetch(SUPABASE_URL + "/auth/v1/otp?redirect_to=" + encodeURIComponent(redirect), {
+  if (!email) return text(500, "El servidor no tiene usuario autorizado.");
+  if (!await consume("mcp-link-send", 3600, 6)) return text(429, "Demasiados intentos. Espera un rato y vuelve a conectar desde ChatGPT.");
+  const back = ISSUER + "/authorize/callback?req=" + encodeURIComponent(reqToken);
+  const r = await fetch(SUPABASE_URL + "/auth/v1/otp?redirect_to=" + encodeURIComponent(back), {
     method: "POST", headers: { apikey: ANON_KEY, "content-type": "application/json" },
-    body: JSON.stringify({ email, create_user: false, code_challenge: await sha256b64u(await authVerifier(String(p.n))), code_challenge_method: "s256" }) });
-  const note = r.ok ? `<p>Enviamos un enlace a <b>${esc(mask(email))}</b>.</p>` : `<p class="err">No se pudo enviar ahora (espera un minuto). Si ya tienes un enlace reciente de esta misma solicitud, úsalo.</p>`;
-  return waitPage(reqToken, note);
+    body: JSON.stringify({ email, create_user: false, code_challenge: await sha256b64u(await authVerifier(n)), code_challenge_method: "s256" }) });
+  if (!r.ok) return text(429, "No se pudo enviar el correo ahora (Supabase permite uno por minuto). Espera un minuto y vuelve a conectar desde ChatGPT.");
+  return text(200, `Mi Catálogo · Conectar ChatGPT
+
+ChatGPT pide permiso para AÑADIR productos a tu catálogo. No podrá leer, editar ni borrar lo que ya tienes.
+
+Enviamos un enlace de acceso a ${mask(email)}.
+Ábrelo EN ESTE MISMO NAVEGADOR y toca el enlace: volverás a ChatGPT ya conectado.
+El enlace caduca en 15 minutos. Puedes cerrar esta pestaña después.`);
 }
 
 // El enlace del correo vuelve aquí con un código PKCE de Supabase Auth.
@@ -191,7 +178,7 @@ async function authorizeCallback(url: URL) {
   const reqToken = url.searchParams.get("req") ?? "";
   const p = await verify(reqToken, "areq");
   const code = url.searchParams.get("code") ?? "";
-  if (!p || !/^[A-Za-z0-9-]{8,128}$/.test(code)) return html(400, page("Enlace no válido o caducado", "<p>Vuelve a ChatGPT e inténtalo otra vez.</p>"));
+  if (!p || !/^[A-Za-z0-9-]{8,128}$/.test(code)) return text(400, "Enlace no válido o caducado. Vuelve a ChatGPT y conecta otra vez.");
   const r = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=pkce", { method: "POST", headers: { apikey: ANON_KEY, "content-type": "application/json" },
     body: JSON.stringify({ auth_code: code, code_verifier: await authVerifier(String(p.n)) }) });
   const session = r.ok ? await r.json().catch(() => null) : null;
@@ -200,20 +187,8 @@ async function authorizeCallback(url: URL) {
     // La sesión de Auth solo prueba la identidad; se cierra al momento.
     await fetch(SUPABASE_URL + "/auth/v1/logout?scope=local", { method: "POST", headers: { apikey: ANON_KEY, authorization: "Bearer " + session.access_token } }).catch(() => {});
   }
-  if (!uid || uid !== OWNER) return html(400, page("No autorizado", "<p>El enlace venció o no corresponde a tu cuenta. Pide otro desde ChatGPT.</p>"));
-  await consume("mcp-ok-" + String(p.n), 86400, 1000);
-  return html(200, page("Autorizado", `<p>Listo. Vuelve a la pestaña de ChatGPT; se conectará sola.</p>
-<form method="get" action="${ISSUER}/authorize/wait"><input type="hidden" name="req" value="${esc(reqToken)}"><button>Continuar en este dispositivo</button></form>`));
-}
-
-async function authorizeWait(url: URL) {
-  const reqToken = url.searchParams.get("req") ?? "";
-  const p = await verify(reqToken, "areq");
-  if (!p) return html(400, page("Solicitud caducada", "<p>Vuelve a ChatGPT e inténtalo otra vez.</p>"));
-  const { data } = await db.from("api_usage").select("count").eq("owner_id", OWNER).eq("bucket", "mcp-ok-" + String(p.n)).limit(1);
-  if (!data?.length) return waitPage(reqToken, "<p>Esperando la aprobación…</p>");
-  // Solo una pestaña recibe el código.
-  if (!await consume("mcp-issued-" + String(p.n), 86400, 1)) return html(200, page("Ya conectado", "<p>Esta autorización ya se completó en otra pestaña.</p>"));
+  if (!uid || uid !== OWNER) return text(400, "No autorizado: el enlace venció, ya se usó o no corresponde a tu cuenta. Conecta otra vez desde ChatGPT.");
+  if (!await consume("mcp-issued-" + String(p.n), 86400, 1)) return text(400, "Esta autorización ya se completó.");
   const authCode = await sign({ t: "code", cid: p.cid, ru: p.ru, cc: p.cc, sub: OWNER, exp: now() + 120, j: crypto.randomUUID() });
   const dest = new URL(String(p.ru));
   dest.searchParams.set("code", authCode);
@@ -424,9 +399,7 @@ Deno.serve(async (req) => {
     if (path === "/mcp") return await mcp(req);
     if (path === "/register" && req.method === "POST") return await register(req);
     if (path === "/authorize" && req.method === "GET") return await authorizeStart(url);
-    if (path === "/authorize/send" && req.method === "POST") return await authorizeSend(await req.formData());
     if (path === "/authorize/callback" && req.method === "GET") return await authorizeCallback(url);
-    if (path === "/authorize/wait" && req.method === "GET") return await authorizeWait(url);
     if (path === "/token" && req.method === "POST") return await tokenEndpoint(req);
     if (path === "/health") return json(200, { ok: true });
     return json(404, { error: "No encontrado" });
