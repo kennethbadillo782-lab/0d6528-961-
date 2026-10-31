@@ -20,7 +20,7 @@ real = users if len(users) == 1 else []
 assert len(real) == 1, 'Usuario propietario no encontrado'
 uid = real[0]['id']
 tool([cli, 'db', 'query', '--linked', '--project-ref', ref, "update public.api_keys set revoked_at=now() where label='ChatGPT MCP (solo guardar)' and revoked_at is null", '--output', 'json'])
-raw = json.loads(tool([cli, 'db', 'query', '--linked', '--project-ref', ref, "select public.create_api_key('ChatGPT MCP (solo guardar)',array['create'],1,'" + uid + "'::uuid) as key", '--output', 'json']))
+raw = json.loads(tool([cli, 'db', 'query', '--linked', '--project-ref', ref, "select public.create_api_key('ChatGPT MCP (solo guardar)',array['create'],180,'" + uid + "'::uuid) as key", '--output', 'json']))
 values = {'MCP_CATALOG_API_KEY': raw['rows'][0]['key'], 'MCP_OWNER_ID': uid}
 current = json.loads(tool([cli, 'secrets', 'list', '--project-ref', ref, '--output', 'json']))
 if '--rotate-signing' in sys.argv or not any(s.get('name') == 'MCP_SIGNING_SECRET' for s in current):
